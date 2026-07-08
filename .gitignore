@@ -1,0 +1,76 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Python packaging and virtual environments
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# FastAPI and local app runtime
+*.log
+logs/
+*.pid
+*.sqlite
+*.sqlite3
+*.db
+media/
+uploads/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Node and Next.js
+node_modules/
+.next/
+out/
+next-env.d.ts
+.vercel/
+.turbo/
+
+# JavaScript package manager caches
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Test and coverage output
+coverage/
+playwright-report/
+test-results/
+
+# TypeScript and framework caches
+*.tsbuildinfo
+.eslintcache
+
+# Editors and operating system files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local AI/editor assistant state
+.claude/
