@@ -15,6 +15,7 @@ the system with user-provided data.
 - [x] Legal document template set
 - [x] Basic documentation
 - [x] Mutual NDA Next.js prototype
+- [x] V1 application foundation with frontend, FastAPI backend, and temporary SQLite
 - [x] Tests
 - [ ] CI/CD
 
@@ -59,7 +60,31 @@ license notice for templates in this directory.
 
 ## Quick Start
 
-The dataset can be used directly as markdown files.
+The V1 foundation runs as a Docker-packaged app with a static Next.js frontend,
+FastAPI backend, and temporary SQLite database. The database is recreated each
+time the backend starts.
+
+```bash
+# Linux
+scripts/start-linux.sh
+scripts/stop-linux.sh
+
+# macOS
+scripts/start-mac.sh
+scripts/stop-mac.sh
+```
+
+Windows PowerShell:
+
+```powershell
+scripts/start-windows.ps1
+scripts/stop-windows.ps1
+```
+
+The app runs at `http://127.0.0.1:8000` by default. Set `PRELEGAL_PORT` to use a
+different host port.
+
+The template dataset can also be used directly as markdown files.
 
 Example catalog read:
 
@@ -67,7 +92,7 @@ Example catalog read:
 node -e "console.log(require('./catalog.json').length)"
 ```
 
-The Mutual NDA creator prototype is located in `frontend/`.
+The Mutual NDA creator frontend is located in `frontend/`.
 
 ```bash
 cd frontend
@@ -76,9 +101,13 @@ npx playwright install chromium
 npm run dev
 ```
 
-To verify the frontend:
+To verify the frontend and backend:
 
 ```bash
+cd backend
+uv run pytest
+
+cd ../frontend
 npm run test:unit
 npm run test:e2e
 npm test
@@ -98,11 +127,14 @@ run `npx playwright install chromium` first.
 
 ```text
 .
+├── backend/
 ├── catalog.json
 ├── docs/
+├── Dockerfile
 ├── frontend/
 ├── LICENSE
 ├── README.md
+├── scripts/
 └── templates/
 ```
 

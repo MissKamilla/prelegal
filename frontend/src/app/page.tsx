@@ -8,7 +8,7 @@ import {
   NdaFormValues,
   standardTerms,
 } from "@/lib/nda";
-import { ChangeEvent, useLayoutEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useLayoutEffect, useRef, useState } from "react";
 
 type Field = {
   key: keyof NdaFormValues;
@@ -42,7 +42,16 @@ const fields: Field[] = [
 
 const sections: Field["section"][] = ["Agreement", "Party 1", "Party 2", "Legal"];
 
+type FakeUser = {
+  email: string;
+  displayName: string;
+};
+
 export default function Home() {
+  const [currentUser, setCurrentUser] = useState<FakeUser | null>(null);
+  const [loginEmail, setLoginEmail] = useState("demo@prelegal.example");
+  const [displayName, setDisplayName] = useState("Demo User");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [values, setValues] = useState<NdaFormValues>(initialNdaValues);
   const [isDownloading, setIsDownloading] = useState(false);
   const [termsPages, setTermsPages] = useState([standardTerms]);
@@ -119,6 +128,42 @@ export default function Home() {
     }));
   }
 
+  async function fakeLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const fallbackUser = {
+      email: loginEmail,
+      displayName,
+    };
+
+    setIsLoggingIn(true);
+
+    try {
+      const response = await fetch("/api/fake-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: loginEmail,
+          display_name: displayName,
+        }),
+      });
+
+      if (!response.ok) {
+        setCurrentUser(fallbackUser);
+        return;
+      }
+
+      const result = (await response.json()) as { user?: FakeUser };
+      setCurrentUser(result.user ?? fallbackUser);
+    } catch {
+      setCurrentUser(fallbackUser);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }
+
   async function downloadPdf() {
     const pages = pageRefs.current.filter((page): page is HTMLElement => Boolean(page));
 
@@ -163,6 +208,47 @@ export default function Home() {
     }
   }
 
+  if (!currentUser) {
+    return (
+      <main className="login-shell">
+        <section className="login-panel" aria-label="Fake login">
+          <div className="brand-row">
+            <span className="brand-mark">PL</span>
+            <div>
+              <p className="eyebrow">Prelegal</p>
+              <h1>Sign in to Prelegal</h1>
+            </div>
+          </div>
+
+          <form className="login-form" onSubmit={fakeLogin}>
+            <label>
+              <span>Email</span>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(event) => setLoginEmail(event.target.value)}
+                required
+              />
+            </label>
+
+            <label>
+              <span>Display name</span>
+              <input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                required
+              />
+            </label>
+
+            <button type="submit" disabled={isLoggingIn}>
+              {isLoggingIn ? "Entering..." : "Enter platform"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <section className="editor-panel" aria-label="NDA details">
@@ -173,6 +259,10 @@ export default function Home() {
             <h1>Mutual NDA Creator</h1>
           </div>
         </div>
+
+        <p className="platform-user">
+          Signed in as <strong>{currentUser.displayName}</strong>
+        </p>
 
         <div className="actions">
           <button type="button" onClick={downloadPdf} disabled={isDownloading}>
