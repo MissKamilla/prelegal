@@ -8,7 +8,7 @@ import {
   NdaFormValues,
   standardTerms,
 } from "@/lib/nda";
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useLayoutEffect, useRef, useState } from "react";
 
 type Field = {
   key: keyof NdaFormValues;
@@ -45,7 +45,69 @@ const sections: Field["section"][] = ["Agreement", "Party 1", "Party 2", "Legal"
 export default function Home() {
   const [values, setValues] = useState<NdaFormValues>(initialNdaValues);
   const [isDownloading, setIsDownloading] = useState(false);
-  const documentRef = useRef<HTMLElement>(null);
+  const [termsPages, setTermsPages] = useState([standardTerms]);
+  const pageRefs = useRef<Array<HTMLElement | null>>([]);
+  const termsMeasureRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    function getOuterHeight(element: Element) {
+      const styles = window.getComputedStyle(element);
+      return (
+        element.getBoundingClientRect().height +
+        Number.parseFloat(styles.marginTop) +
+        Number.parseFloat(styles.marginBottom)
+      );
+    }
+
+    function paginateTerms() {
+      const measurePage = termsMeasureRef.current;
+      if (!measurePage) {
+        return;
+      }
+
+      const styles = window.getComputedStyle(measurePage);
+      const verticalPadding =
+        Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+      const availableHeight = measurePage.clientHeight - verticalPadding;
+      const heading = measurePage.querySelector("h3");
+      const footer = measurePage.querySelector("footer");
+      const paragraphNodes = Array.from(measurePage.querySelectorAll("[data-term-index]"));
+      const headingHeight = heading ? getOuterHeight(heading) : 0;
+      const footerHeight = footer ? getOuterHeight(footer) : 0;
+      const pageHeightLimit = availableHeight - headingHeight - footerHeight;
+      const nextPages: typeof standardTerms[] = [];
+      let currentPage: typeof standardTerms = [];
+      let currentHeight = 0;
+
+      paragraphNodes.forEach((paragraph, index) => {
+        const paragraphHeight = getOuterHeight(paragraph);
+        const term = standardTerms[index];
+
+        if (currentPage.length > 0 && currentHeight + paragraphHeight > pageHeightLimit) {
+          nextPages.push(currentPage);
+          currentPage = [];
+          currentHeight = 0;
+        }
+
+        currentPage.push(term);
+        currentHeight += paragraphHeight;
+      });
+
+      if (currentPage.length > 0) {
+        nextPages.push(currentPage);
+      }
+
+      setTermsPages(nextPages.length > 0 ? nextPages : [standardTerms]);
+    }
+
+    paginateTerms();
+    window.addEventListener("resize", paginateTerms);
+    document.fonts?.ready.then(paginateTerms);
+
+    return () => {
+      window.removeEventListener("resize", paginateTerms);
+    };
+  }, []);
 
   function updateField(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -58,74 +120,40 @@ export default function Home() {
   }
 
   async function downloadPdf() {
-    if (!documentRef.current || isDownloading) {
+    const pages = pageRefs.current.filter((page): page is HTMLElement => Boolean(page));
+
+    if (!pages.length || isDownloading) {
       return;
     }
 
     setIsDownloading(true);
 
     try {
-      const source = documentRef.current;
-      const canvas = await html2canvas(source, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-        windowWidth: source.scrollWidth,
-        windowHeight: source.scrollHeight,
-      });
-
       const pdf = new jsPDF({ unit: "pt", format: "letter", orientation: "portrait" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 24;
-      const contentWidth = pageWidth - margin * 2;
-      const contentHeight = pageHeight - margin * 2;
-      const imageWidth = contentWidth;
-      const pageCanvasHeight = (contentHeight * canvas.width) / imageWidth;
-      let renderedCanvasY = 0;
-      let pageIndex = 0;
 
-      while (renderedCanvasY < canvas.height) {
-        const sliceHeight = Math.min(pageCanvasHeight, canvas.height - renderedCanvasY);
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = sliceHeight;
+      for (const [index, page] of pages.entries()) {
+        const canvas = await html2canvas(page, {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+          windowWidth: Math.max(window.innerWidth, 1200),
+          windowHeight: page.scrollHeight,
+        });
 
-        const context = pageCanvas.getContext("2d");
-        if (!context) {
-          throw new Error("Unable to prepare PDF page.");
-        }
-
-        context.fillStyle = "#ffffff";
-        context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        context.drawImage(
-          canvas,
-          0,
-          renderedCanvasY,
-          canvas.width,
-          sliceHeight,
-          0,
-          0,
-          canvas.width,
-          sliceHeight,
-        );
-
-        if (pageIndex > 0) {
+        if (index > 0) {
           pdf.addPage();
         }
 
-        const pageImageHeight = (sliceHeight * imageWidth) / canvas.width;
         pdf.addImage(
-          pageCanvas.toDataURL("image/png"),
+          canvas.toDataURL("image/png"),
           "PNG",
-          margin,
-          margin,
-          imageWidth,
-          pageImageHeight,
+          0,
+          0,
+          pageWidth,
+          pageHeight,
         );
-
-        renderedCanvasY += sliceHeight;
-        pageIndex += 1;
       }
 
       const fileParty = values.partyOneName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -183,108 +211,150 @@ export default function Home() {
       </section>
 
       <section className="preview-panel" aria-label="Mutual NDA preview">
-        <article className="document" ref={documentRef}>
-          <header>
-            <p>Common Paper Mutual NDA Draft</p>
-            <h2>Mutual Non-Disclosure Agreement</h2>
-          </header>
+        <div className="document-stack">
+          <article className="document document-page pagination-measure" ref={termsMeasureRef}>
+            <section>
+              <h3>Standard Terms</h3>
+              {standardTerms.map((term, index) => (
+                <p data-term-index={index} key={term.title}>
+                  <strong>
+                    {index + 1}. {term.title}.
+                  </strong>{" "}
+                  {term.body}
+                </p>
+              ))}
+            </section>
+            <footer>
+              Common Paper Mutual Non-Disclosure Agreement Version 1.0 is free to use under CC BY
+              4.0. This prototype prepares a working draft and is not legal advice.
+            </footer>
+          </article>
 
-          <section>
-            <h3>Cover Page</h3>
-            <dl className="summary-grid">
-              <div>
-                <dt>Purpose</dt>
-                <dd>{values.purpose}</dd>
-              </div>
-              <div>
-                <dt>Effective Date</dt>
-                <dd>{formatDate(values.effectiveDate)}</dd>
-              </div>
-              <div>
-                <dt>MNDA Term</dt>
-                <dd>Expires {values.mndaTermYears} year(s) from Effective Date.</dd>
-              </div>
-              <div>
-                <dt>Term of Confidentiality</dt>
-                <dd>{values.confidentialityTermYears} year(s) from Effective Date.</dd>
-              </div>
-              <div>
-                <dt>Governing Law</dt>
-                <dd>{values.governingLaw}</dd>
-              </div>
-              <div>
-                <dt>Jurisdiction</dt>
-                <dd>{values.jurisdiction}</dd>
-              </div>
-              <div>
-                <dt>Modifications</dt>
-                <dd>{values.modifications}</dd>
-              </div>
-            </dl>
-          </section>
+          <article
+            className="document document-page"
+            ref={(node) => {
+              pageRefs.current[0] = node;
+            }}
+          >
+            <header>
+              <p>Common Paper Mutual NDA Draft</p>
+              <h2>Mutual Non-Disclosure Agreement</h2>
+            </header>
 
-          <section>
-            <h3>Parties</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Party 1</th>
-                  <th>Party 2</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th>Company</th>
-                  <td>{values.partyOneName}</td>
-                  <td>{values.partyTwoName}</td>
-                </tr>
-                <tr>
-                  <th>Print Name</th>
-                  <td>{values.partyOneSigner}</td>
-                  <td>{values.partyTwoSigner}</td>
-                </tr>
-                <tr>
-                  <th>Title</th>
-                  <td>{values.partyOneTitle}</td>
-                  <td>{values.partyTwoTitle}</td>
-                </tr>
-                <tr>
-                  <th>Notice Address</th>
-                  <td>{values.partyOneAddress}</td>
-                  <td>{values.partyTwoAddress}</td>
-                </tr>
-                <tr>
-                  <th>Signature</th>
-                  <td />
-                  <td />
-                </tr>
-                <tr>
-                  <th>Date</th>
-                  <td />
-                  <td />
-                </tr>
-              </tbody>
-            </table>
-          </section>
+            <section>
+              <h3>Cover Page</h3>
+              <dl className="summary-grid">
+                <div>
+                  <dt>Purpose</dt>
+                  <dd>{values.purpose}</dd>
+                </div>
+                <div>
+                  <dt>Effective Date</dt>
+                  <dd>{formatDate(values.effectiveDate)}</dd>
+                </div>
+                <div>
+                  <dt>MNDA Term</dt>
+                  <dd>Expires {values.mndaTermYears} year(s) from Effective Date.</dd>
+                </div>
+                <div>
+                  <dt>Term of Confidentiality</dt>
+                  <dd>{values.confidentialityTermYears} year(s) from Effective Date.</dd>
+                </div>
+                <div>
+                  <dt>Governing Law</dt>
+                  <dd>{values.governingLaw}</dd>
+                </div>
+                <div>
+                  <dt>Jurisdiction</dt>
+                  <dd>{values.jurisdiction}</dd>
+                </div>
+                <div>
+                  <dt>Modifications</dt>
+                  <dd>{values.modifications}</dd>
+                </div>
+              </dl>
+            </section>
 
-          <section>
-            <h3>Standard Terms</h3>
-            {standardTerms.map((term, index) => (
-              <p key={term.title}>
-                <strong>
-                  {index + 1}. {term.title}.
-                </strong>{" "}
-                {term.body}
-              </p>
-            ))}
-          </section>
+            <section>
+              <h3>Parties</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Party 1</th>
+                    <th>Party 2</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>Company</th>
+                    <td>{values.partyOneName}</td>
+                    <td>{values.partyTwoName}</td>
+                  </tr>
+                  <tr>
+                    <th>Print Name</th>
+                    <td>{values.partyOneSigner}</td>
+                    <td>{values.partyTwoSigner}</td>
+                  </tr>
+                  <tr>
+                    <th>Title</th>
+                    <td>{values.partyOneTitle}</td>
+                    <td>{values.partyTwoTitle}</td>
+                  </tr>
+                  <tr>
+                    <th>Notice Address</th>
+                    <td>{values.partyOneAddress}</td>
+                    <td>{values.partyTwoAddress}</td>
+                  </tr>
+                  <tr>
+                    <th>Signature</th>
+                    <td />
+                    <td />
+                  </tr>
+                  <tr>
+                    <th>Date</th>
+                    <td />
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+          </article>
 
-          <footer>
-            Common Paper Mutual Non-Disclosure Agreement Version 1.0 is free to use under CC BY
-            4.0. This prototype prepares a working draft and is not legal advice.
-          </footer>
-        </article>
+          {termsPages.map((terms, pageIndex) => (
+            <article
+              className="document document-page"
+              key={pageIndex}
+              ref={(node) => {
+                pageRefs.current[pageIndex + 1] = node;
+              }}
+            >
+              <section>
+                <h3>{pageIndex === 0 ? "Standard Terms" : "Standard Terms Continued"}</h3>
+                {terms.map((term, termIndex) => (
+                  <p key={term.title}>
+                    <strong>
+                      {termsPages
+                        .slice(0, pageIndex)
+                        .reduce((total, page) => total + page.length, 0) +
+                        termIndex +
+                        1}
+                      . {term.title}.
+                    </strong>{" "}
+                    {term.body}
+                  </p>
+                ))}
+              </section>
+
+              {pageIndex === termsPages.length - 1 ? (
+                <footer>
+                  Common Paper Mutual Non-Disclosure Agreement Version 1.0 is free to use under
+                  CC BY 4.0. This prototype prepares a working draft and is not legal advice.
+                </footer>
+              ) : null}
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );
