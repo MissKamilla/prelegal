@@ -14,6 +14,7 @@ Prelegal - проект на ранней стадии разработки дл
 
 - [x] Набор шаблонов юридических документов
 - [x] Базовая документация
+- [x] Прототип Next.js приложения для Mutual NDA
 - [ ] Тесты
 - [ ] CI/CD
 
@@ -58,8 +59,7 @@ templates/
 
 ## Быстрый старт
 
-Сейчас проект не содержит исполняемого приложения, поэтому установка зависимостей не
-требуется. Dataset можно использовать напрямую как markdown-файлы.
+Dataset можно использовать напрямую как markdown-файлы.
 
 Пример чтения catalog:
 
@@ -67,14 +67,29 @@ templates/
 node -e "console.log(require('./catalog.json').length)"
 ```
 
-После добавления приложения этот раздел будет обновлен командами для локальной
-разработки, тестирования и сборки.
+Прототип Mutual NDA creator находится в `frontend/`.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Для проверки frontend:
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+npm audit --audit-level=moderate
+```
 
 ## Структура репозитория
 
 ```text
 .
 ├── catalog.json
+├── frontend/
 ├── LICENSE
 ├── README.md
 └── templates/
