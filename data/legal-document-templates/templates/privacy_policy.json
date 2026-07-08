@@ -1,0 +1,93 @@
+{
+  "id": "privacy_policy",
+  "title": "Website Privacy Policy",
+  "category": "privacy",
+  "jurisdiction": "Generic",
+  "language": "en-US",
+  "description": "A starter privacy policy for a website or web application.",
+  "variables": [
+    {
+      "name": "company_name",
+      "label": "Company legal name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "website_url",
+      "label": "Website URL",
+      "type": "url",
+      "required": true
+    },
+    {
+      "name": "contact_email",
+      "label": "Privacy contact email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "effective_date",
+      "label": "Effective date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "data_categories",
+      "label": "Categories of personal data collected",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "processing_purposes",
+      "label": "Processing purposes",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "third_party_disclosures",
+      "label": "Third-party disclosures",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "retention_period",
+      "label": "Data retention period",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "sections": [
+    {
+      "heading": "Introduction",
+      "body": "This Privacy Policy explains how {{company_name}} collects, uses, discloses, and protects personal information in connection with {{website_url}}. It is effective as of {{effective_date}}."
+    },
+    {
+      "heading": "Information We Collect",
+      "body": "We may collect the following categories of personal information: {{data_categories}}."
+    },
+    {
+      "heading": "How We Use Information",
+      "body": "We use personal information for the following purposes: {{processing_purposes}}."
+    },
+    {
+      "heading": "How We Share Information",
+      "body": "We may disclose personal information to service providers, business partners, legal authorities, and other parties as follows: {{third_party_disclosures}}."
+    },
+    {
+      "heading": "Retention",
+      "body": "We retain personal information for {{retention_period}}, unless a longer retention period is required or permitted by law."
+    },
+    {
+      "heading": "User Rights",
+      "body": "Depending on your location, you may have rights to access, correct, delete, restrict, or object to certain processing of your personal information."
+    },
+    {
+      "heading": "Contact",
+      "body": "If you have questions about this Privacy Policy, contact us at {{contact_email}}."
+    }
+  ],
+  "review_notes": [
+    "Map data practices before publishing the policy.",
+    "Adapt for GDPR, UK GDPR, CCPA/CPRA, COPPA, sector-specific, and local requirements as applicable.",
+    "Confirm cookie, analytics, advertising, cross-border transfer, and processor disclosures."
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "id": "mutual_nda",
+  "title": "Mutual Non-Disclosure Agreement",
+  "category": "confidentiality",
+  "jurisdiction": "Generic",
+  "language": "en-US",
+  "description": "A mutual confidentiality agreement for two parties exchanging non-public business information.",
+  "variables": [
+    {
+      "name": "effective_date",
+      "label": "Effective date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "party_a_name",
+      "label": "First party legal name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "party_a_address",
+      "label": "First party address",
+      "type": "address",
+      "required": true
+    },
+    {
+      "name": "party_b_name",
+      "label": "Second party legal name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "party_b_address",
+      "label": "Second party address",
+      "type": "address",
+      "required": true
+    },
+    {
+      "name": "purpose",
+      "label": "Purpose of disclosure",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "confidentiality_period_years",
+      "label": "Confidentiality period in years",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "governing_law",
+      "label": "Governing law",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "sections": [
+    {
+      "heading": "Parties",
+      "body": "This Mutual Non-Disclosure Agreement is entered into as of {{effective_date}} by and between {{party_a_name}}, located at {{party_a_address}}, and {{party_b_name}}, located at {{party_b_address}}."
+    },
+    {
+      "heading": "Purpose",
+      "body": "The parties wish to exchange certain confidential information solely for the purpose of {{purpose}}."
+    },
+    {
+      "heading": "Confidential Information",
+      "body": "Confidential Information means non-public information disclosed by either party that is marked confidential or should reasonably be understood to be confidential given the nature of the information and circumstances of disclosure."
+    },
+    {
+      "heading": "Obligations",
+      "body": "Each receiving party will use Confidential Information only for the stated purpose, protect it with reasonable care, and limit access to personnel and advisors who need to know it and are bound by confidentiality obligations."
+    },
+    {
+      "heading": "Exclusions",
+      "body": "Confidential Information does not include information that is publicly available, already known without restriction, independently developed without use of Confidential Information, or received from a third party without breach of duty."
+    },
+    {
+      "heading": "Term",
+      "body": "The confidentiality obligations continue for {{confidentiality_period_years}} years after the date of disclosure unless a longer period is required for trade secrets under applicable law."
+    },
+    {
+      "heading": "Governing Law",
+      "body": "This Agreement is governed by the laws of {{governing_law}}, without regard to conflict of laws principles."
+    }
+  ],
+  "review_notes": [
+    "Confirm whether unilateral or mutual confidentiality is appropriate.",
+    "Review trade secret language for the selected jurisdiction.",
+    "Add injunctive relief, export control, or residual knowledge clauses if needed."
+  ]
+}

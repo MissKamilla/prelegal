@@ -1,0 +1,103 @@
+{
+  "id": "consulting_agreement",
+  "title": "Consulting Services Agreement",
+  "category": "commercial",
+  "jurisdiction": "Generic",
+  "language": "en-US",
+  "description": "A services agreement for an independent consultant providing defined deliverables to a client.",
+  "variables": [
+    {
+      "name": "effective_date",
+      "label": "Effective date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "client_name",
+      "label": "Client legal name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "consultant_name",
+      "label": "Consultant legal name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "services_description",
+      "label": "Services description",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "fees",
+      "label": "Fees",
+      "type": "currency",
+      "required": true
+    },
+    {
+      "name": "payment_terms",
+      "label": "Payment terms",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "start_date",
+      "label": "Start date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "end_date",
+      "label": "End date",
+      "type": "date",
+      "required": false
+    },
+    {
+      "name": "governing_law",
+      "label": "Governing law",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "sections": [
+    {
+      "heading": "Engagement",
+      "body": "{{client_name}} engages {{consultant_name}} to perform the services described in this Agreement beginning on {{start_date}}."
+    },
+    {
+      "heading": "Services",
+      "body": "The consultant will provide the following services: {{services_description}}."
+    },
+    {
+      "heading": "Fees and Payment",
+      "body": "The client will pay {{fees}} according to the following payment terms: {{payment_terms}}."
+    },
+    {
+      "heading": "Independent Contractor",
+      "body": "The consultant is an independent contractor and is not an employee, partner, agent, or joint venturer of the client."
+    },
+    {
+      "heading": "Intellectual Property",
+      "body": "Unless otherwise agreed in writing, work product specifically created for the client under this Agreement will be assigned to the client upon full payment of undisputed fees."
+    },
+    {
+      "heading": "Confidentiality",
+      "body": "Each party will protect the other party's confidential information and use it only to perform or receive services under this Agreement."
+    },
+    {
+      "heading": "Term and Termination",
+      "body": "This Agreement starts on {{effective_date}} and continues until {{end_date}} unless terminated earlier according to its terms."
+    },
+    {
+      "heading": "Governing Law",
+      "body": "This Agreement is governed by the laws of {{governing_law}}."
+    }
+  ],
+  "review_notes": [
+    "Confirm worker classification requirements in the relevant jurisdiction.",
+    "Clarify ownership of pre-existing materials and third-party materials.",
+    "Add limitation of liability, insurance, tax, and expense clauses as needed."
+  ]
+}
