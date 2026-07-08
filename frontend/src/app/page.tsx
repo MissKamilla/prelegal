@@ -1,14 +1,14 @@
 "use client";
 
+import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import {
-  buildNdaMarkdown,
   formatDate,
   initialNdaValues,
   NdaFormValues,
   standardTerms,
 } from "@/lib/nda";
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useRef, useState } from "react";
 
 type Field = {
   key: keyof NdaFormValues;
@@ -42,27 +42,10 @@ const fields: Field[] = [
 
 const sections: Field["section"][] = ["Agreement", "Party 1", "Party 2", "Legal"];
 
-function addWrappedText(pdf: jsPDF, text: string, x: number, y: number, maxWidth: number) {
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const lines = pdf.splitTextToSize(text, maxWidth) as string[];
-  let cursorY = y;
-
-  lines.forEach((line) => {
-    if (cursorY > pageHeight - 22) {
-      pdf.addPage();
-      cursorY = 22;
-    }
-
-    pdf.text(line, x, cursorY);
-    cursorY += 6;
-  });
-
-  return cursorY;
-}
-
 export default function Home() {
   const [values, setValues] = useState<NdaFormValues>(initialNdaValues);
-  const markdown = useMemo(() => buildNdaMarkdown(values), [values]);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const documentRef = useRef<HTMLElement>(null);
 
   function updateField(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -74,34 +57,82 @@ export default function Home() {
     }));
   }
 
-  function downloadPdf() {
-    const pdf = new jsPDF({ unit: "mm", format: "letter" });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 18;
-    const maxWidth = pageWidth - margin * 2;
-    let y = 20;
+  async function downloadPdf() {
+    if (!documentRef.current || isDownloading) {
+      return;
+    }
 
-    pdf.setFont("times", "bold");
-    pdf.setFontSize(18);
-    y = addWrappedText(pdf, "Mutual Non-Disclosure Agreement", margin, y, maxWidth) + 4;
+    setIsDownloading(true);
 
-    pdf.setFont("times", "normal");
-    pdf.setFontSize(10);
-    markdown.split("\n").forEach((line) => {
-      const cleanLine = line.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim();
-      if (!cleanLine) {
-        y += 3;
-        return;
+    try {
+      const source = documentRef.current;
+      const canvas = await html2canvas(source, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        windowWidth: source.scrollWidth,
+        windowHeight: source.scrollHeight,
+      });
+
+      const pdf = new jsPDF({ unit: "pt", format: "letter", orientation: "portrait" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - margin * 2;
+      const imageWidth = contentWidth;
+      const pageCanvasHeight = (contentHeight * canvas.width) / imageWidth;
+      let renderedCanvasY = 0;
+      let pageIndex = 0;
+
+      while (renderedCanvasY < canvas.height) {
+        const sliceHeight = Math.min(pageCanvasHeight, canvas.height - renderedCanvasY);
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+
+        const context = pageCanvas.getContext("2d");
+        if (!context) {
+          throw new Error("Unable to prepare PDF page.");
+        }
+
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        context.drawImage(
+          canvas,
+          0,
+          renderedCanvasY,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceHeight,
+        );
+
+        if (pageIndex > 0) {
+          pdf.addPage();
+        }
+
+        const pageImageHeight = (sliceHeight * imageWidth) / canvas.width;
+        pdf.addImage(
+          pageCanvas.toDataURL("image/png"),
+          "PNG",
+          margin,
+          margin,
+          imageWidth,
+          pageImageHeight,
+        );
+
+        renderedCanvasY += sliceHeight;
+        pageIndex += 1;
       }
 
-      const isHeading = line.startsWith("##") || line.startsWith("# ");
-      pdf.setFont("times", isHeading ? "bold" : "normal");
-      pdf.setFontSize(isHeading ? 13 : 10);
-      y = addWrappedText(pdf, cleanLine, margin, y, maxWidth) + (isHeading ? 2 : 1);
-    });
-
-    const fileParty = values.partyOneName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    pdf.save(`mutual-nda-${fileParty || "draft"}.pdf`);
+      const fileParty = values.partyOneName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      pdf.save(`mutual-nda-${fileParty || "draft"}.pdf`);
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   return (
@@ -116,8 +147,8 @@ export default function Home() {
         </div>
 
         <div className="actions">
-          <button type="button" onClick={downloadPdf}>
-            Download PDF
+          <button type="button" onClick={downloadPdf} disabled={isDownloading}>
+            {isDownloading ? "Preparing PDF..." : "Download PDF"}
           </button>
         </div>
 
@@ -152,7 +183,7 @@ export default function Home() {
       </section>
 
       <section className="preview-panel" aria-label="Mutual NDA preview">
-        <article className="document">
+        <article className="document" ref={documentRef}>
           <header>
             <p>Common Paper Mutual NDA Draft</p>
             <h2>Mutual Non-Disclosure Agreement</h2>
