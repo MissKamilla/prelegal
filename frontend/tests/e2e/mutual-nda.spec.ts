@@ -1,8 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, Page, test } from "@playwright/test";
+
+async function enterPlatform(page: Page) {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Sign in to Prelegal" })).toBeVisible();
+  await page.getByRole("button", { name: "Enter platform" }).click();
+  await expect(page.getByRole("heading", { name: "Mutual NDA Creator" })).toBeVisible();
+}
 
 test.describe("Mutual NDA Creator", () => {
   test("renders the default draft and standard terms", async ({ page }) => {
-    await page.goto("/");
+    await enterPlatform(page);
 
     await expect(page.getByRole("heading", { name: "Mutual NDA Creator" })).toBeVisible();
     await expect(
@@ -20,7 +27,7 @@ test.describe("Mutual NDA Creator", () => {
   });
 
   test("updates the preview when agreement and party fields change", async ({ page }) => {
-    await page.goto("/");
+    await enterPlatform(page);
 
     await page.getByLabel("Purpose").fill("Exploring a co-development agreement.");
     await page.getByLabel("Effective date").fill("2026-07-08");
@@ -50,7 +57,7 @@ test.describe("Mutual NDA Creator", () => {
   });
 
   test("keeps the PDF action available without mutating the form", async ({ page }) => {
-    await page.goto("/");
+    await enterPlatform(page);
 
     const downloadButton = page.getByRole("button", { name: "Download PDF" });
     await expect(downloadButton).toBeEnabled();

@@ -1,8 +1,10 @@
 # Python bytecode and caches
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+**/.pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .pyre/
@@ -14,6 +16,7 @@ htmlcov/
 
 # Python packaging and virtual environments
 .venv/
+**/.venv/
 venv/
 env/
 ENV/
@@ -60,6 +63,7 @@ next-env.d.ts
 coverage/
 playwright-report/
 test-results/
+**/test-results/
 
 # TypeScript and framework caches
 *.tsbuildinfo

@@ -13,11 +13,13 @@ OS, date, tester, and pass/fail result for each scenario.
 ## Smoke Test
 
 1. Confirm the page loads without console errors.
-2. Confirm the left editor shows the Prelegal brand, `Mutual NDA Creator` heading, and
+2. Confirm the fake login screen shows the Prelegal brand and `Sign in to Prelegal`.
+3. Click `Enter platform`.
+4. Confirm the left editor shows the Prelegal brand, `Mutual NDA Creator` heading, and
    `Download PDF` button.
-3. Confirm the right preview shows `Mutual Non-Disclosure Agreement`, `Cover Page`,
+5. Confirm the right preview shows `Mutual Non-Disclosure Agreement`, `Cover Page`,
    `Parties`, and `Standard Terms`.
-4. Confirm the default parties are `Acme, Inc.` and `Example Partner LLC`.
+6. Confirm the default parties are `Acme, Inc.` and `Example Partner LLC`.
 
 ## Form Editing
 
