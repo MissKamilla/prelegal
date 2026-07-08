@@ -2,11 +2,15 @@
   "name": "prelegal-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test src/**/*.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
@@ -19,6 +23,7 @@
     "postcss": "8.5.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@types/node": "^22.13.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
