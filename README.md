@@ -1,26 +1,27 @@
 # prelegal
 
-Prelegal - проект на ранней стадии разработки для подготовки юридических материалов и
-рабочих процессов перед передачей их юристу или юридической команде.
+Prelegal is an early-stage project for preparing legal materials and workflows before
+handoff to a lawyer or legal team.
 
-> Проект находится в активной разработке. Планируемый срок завершения первого этапа -
-> 15 июля 2026 г.
+> This project is in active development. The planned completion date for the first
+> milestone is July 15, 2026.
 
-## Текущий статус
+## Current Status
 
-Репозиторий содержит набор markdown-шаблонов юридических документов, собранных из
-публичных репозиториев Common Paper. Эти шаблоны предназначены для последующей
-модификации системой под пользовательские данные.
+The repository contains a set of markdown legal document templates collected from
+public Common Paper repositories. These templates are intended to be customized by
+the system with user-provided data.
 
-- [x] Набор шаблонов юридических документов
-- [x] Базовая документация
-- [ ] Тесты
+- [x] Legal document template set
+- [x] Basic documentation
+- [x] Mutual NDA Next.js prototype
+- [x] Tests
 - [ ] CI/CD
 
-## Dataset шаблонов
+## Template Dataset
 
-Шаблоны находятся в директории `templates/`. Корневой файл `catalog.json`
-содержит название, описание и имя файла для каждого скачанного markdown-документа.
+Templates are stored in `templates/`. The root `catalog.json` file contains the
+title, description, and filename for each downloaded markdown document.
 
 ```text
 templates/
@@ -39,7 +40,7 @@ templates/
 └── sla.md
 ```
 
-В набор включены:
+The dataset includes:
 
 - Mutual Non-Disclosure Agreement;
 - Cloud Service Agreement;
@@ -53,40 +54,65 @@ templates/
 - Pilot Agreement;
 - AI Addendum.
 
-Файл `templates/LICENSE.txt` содержит атрибуцию Common Paper и указание на
-лицензию CC BY 4.0 для шаблонов в этой директории.
+`templates/LICENSE.txt` contains the Common Paper attribution and the CC BY 4.0
+license notice for templates in this directory.
 
-## Быстрый старт
+## Quick Start
 
-Сейчас проект не содержит исполняемого приложения, поэтому установка зависимостей не
-требуется. Dataset можно использовать напрямую как markdown-файлы.
+The dataset can be used directly as markdown files.
 
-Пример чтения catalog:
+Example catalog read:
 
 ```bash
 node -e "console.log(require('./catalog.json').length)"
 ```
 
-После добавления приложения этот раздел будет обновлен командами для локальной
-разработки, тестирования и сборки.
+The Mutual NDA creator prototype is located in `frontend/`.
 
-## Структура репозитория
+```bash
+cd frontend
+npm install
+npx playwright install chromium
+npm run dev
+```
+
+To verify the frontend:
+
+```bash
+npm run test:unit
+npm run test:e2e
+npm test
+npm run typecheck
+npm run lint
+npm run build
+npm audit --audit-level=moderate
+```
+
+The manual regression checklist is available at
+[`docs/manual-tests.md`](docs/manual-tests.md).
+
+If `npm run test:e2e` runs in a clean environment without Playwright browsers,
+run `npx playwright install chromium` first.
+
+## Repository Structure
 
 ```text
 .
 ├── catalog.json
+├── docs/
+├── frontend/
 ├── LICENSE
 ├── README.md
 └── templates/
 ```
 
-## Участие в разработке
+## Contributing
 
-1. Создайте отдельную ветку от `main`.
-2. Внесите изменения небольшими логическими коммитами.
-3. Проверьте форматирование, тесты и документацию, если они применимы.
-4. Откройте pull request с кратким описанием изменений.
+1. Create a separate branch from `main`.
+2. Make changes in small logical commits.
+3. Verify formatting, tests, and documentation when applicable.
+4. Open a pull request with a brief change summary.
 
-## Лицензия
+## License
 
-Проект распространяется под лицензией MIT. Подробности см. в файле [LICENSE](LICENSE).
+This project is distributed under the MIT License. See [LICENSE](LICENSE) for details.
