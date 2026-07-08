@@ -8,9 +8,9 @@ Prelegal - проект на ранней стадии разработки дл
 
 ## Текущий статус
 
-Репозиторий содержит стартовый набор шаблонов юридических документов в
-машиночитаемом формате. Эти шаблоны предназначены для последующей модификации
-системой под пользовательские данные.
+Репозиторий содержит набор markdown-шаблонов юридических документов, собранных из
+публичных репозиториев Common Paper. Эти шаблоны предназначены для последующей
+модификации системой под пользовательские данные.
 
 - [x] Набор шаблонов юридических документов
 - [x] Базовая документация
@@ -19,37 +19,52 @@ Prelegal - проект на ранней стадии разработки дл
 
 ## Dataset шаблонов
 
-Шаблоны находятся в директории `data/legal-document-templates/`.
+Шаблоны находятся в директории `templates/`. Корневой файл `catalog.json`
+содержит название, описание и имя файла для каждого скачанного markdown-документа.
 
 ```text
-data/legal-document-templates/
-├── README.md
-├── manifest.json
-├── schema.json
-└── templates/
-    ├── consulting_agreement.json
-    ├── employment_offer_letter.json
-    ├── mutual_nda.json
-    ├── power_of_attorney.json
-    └── privacy_policy.json
+templates/
+├── AI-Addendum.md
+├── BAA.md
+├── CSA.md
+├── DPA.md
+├── LICENSE.txt
+├── Mutual-NDA-coverpage.md
+├── Mutual-NDA.md
+├── Partnership-Agreement.md
+├── Pilot-Agreement.md
+├── Software-License-Agreement.md
+├── design-partner-agreement.md
+├── psa.md
+└── sla.md
 ```
 
-Каждый шаблон содержит:
+В набор включены:
 
-- метаданные документа;
-- список переменных для заполнения;
-- секции документа с placeholder-значениями вида `{{variable_name}}`;
-- предупреждения и ограничения для последующей юридической проверки.
+- Mutual Non-Disclosure Agreement;
+- Cloud Service Agreement;
+- Service Level Agreement;
+- Data Processing Agreement;
+- Design Partner Agreement;
+- Professional Services Agreement;
+- Partnership Agreement;
+- Business Associate Agreement;
+- Software License Agreement;
+- Pilot Agreement;
+- AI Addendum.
+
+Файл `templates/LICENSE.txt` содержит атрибуцию Common Paper и указание на
+лицензию CC BY 4.0 для шаблонов в этой директории.
 
 ## Быстрый старт
 
 Сейчас проект не содержит исполняемого приложения, поэтому установка зависимостей не
-требуется. Dataset можно использовать напрямую как JSON.
+требуется. Dataset можно использовать напрямую как markdown-файлы.
 
-Пример чтения manifest:
+Пример чтения catalog:
 
 ```bash
-node -e "console.log(require('./data/legal-document-templates/manifest.json').templates.length)"
+node -e "console.log(require('./catalog.json').length)"
 ```
 
 После добавления приложения этот раздел будет обновлен командами для локальной
@@ -59,10 +74,10 @@ node -e "console.log(require('./data/legal-document-templates/manifest.json').te
 
 ```text
 .
-├── data/
-│   └── legal-document-templates/
+├── catalog.json
 ├── LICENSE
-└── README.md
+├── README.md
+└── templates/
 ```
 
 ## Участие в разработке

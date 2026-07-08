@@ -1,0 +1,7 @@
+The markdown legal document templates in this directory are sourced from Common Paper repositories at https://github.com/CommonPaper.
+
+Common Paper makes these agreement templates free to use under the Creative Commons Attribution 4.0 International License (CC BY 4.0).
+
+License text: https://creativecommons.org/licenses/by/4.0/
+
+Attribution: Common Paper (https://commonpaper.com).
