@@ -7,17 +7,51 @@ async function enterPlatform(page: Page) {
   await expect(page.getByRole("heading", { name: "Mutual NDA Creator" })).toBeVisible();
 }
 
+const ndaAnswers = [
+  "Exploring a co-development agreement.",
+  "2026-07-08",
+  "2",
+  "4",
+  "Northstar Labs, Inc.",
+  "Nora North",
+  "General Counsel",
+  "legal@northstar.example",
+  "Harbor AI LLC",
+  "Hank Harbor",
+  "COO",
+  "notices@harbor.example",
+  "New York",
+  "state and federal courts located in New York County, NY",
+  "Residual knowledge clause excluded.",
+];
+
+async function sendChatAnswer(page: Page, answer: string) {
+  await page
+    .locator("#chat-answer")
+    .fill(answer);
+  await page.getByRole("button", { name: "Send answer" }).click();
+}
+
 test.describe("Mutual NDA Creator", () => {
-  test("renders the default draft and standard terms", async ({ page }) => {
+  test("starts the AI chat with a greeting and first question", async ({ page }) => {
     await enterPlatform(page);
 
     await expect(page.getByRole("heading", { name: "Mutual NDA Creator" })).toBeVisible();
+    await expect(page.getByLabel("AI chat for Mutual NDA")).toContainText(
+      "Hi, I can help prepare a Mutual NDA.",
+    );
+    await expect(page.getByLabel("AI chat for Mutual NDA")).toContainText(
+      "What is the purpose of this Mutual NDA?",
+    );
+    await expect(page.getByLabel("NDA completion progress")).toHaveText(
+      "0 of 15 details collected",
+    );
+    await expect(page.getByRole("button", { name: "Download PDF" })).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: "Mutual Non-Disclosure Agreement" }),
     ).toBeVisible();
-    await expect(page.getByText("Acme, Inc.")).toBeVisible();
-    await expect(page.getByText("Example Partner LLC")).toBeVisible();
     const visibleDocuments = page.locator("article.document:not(.pagination-measure)");
+    await expect(visibleDocuments.getByText("[Purpose]").first()).toBeVisible();
     await expect(
       visibleDocuments.getByText("Use and Protection of Confidential Information").first(),
     ).toBeVisible();
@@ -26,43 +60,57 @@ test.describe("Mutual NDA Creator", () => {
     ).toBeVisible();
   });
 
-  test("updates the preview when agreement and party fields change", async ({ page }) => {
+  test("updates the preview immediately after each chat answer", async ({ page }) => {
     await enterPlatform(page);
 
-    await page.getByLabel("Purpose").fill("Exploring a co-development agreement.");
-    await page.getByLabel("Effective date").fill("2026-07-08");
-    await page.getByLabel("MNDA term, years").fill("2");
-    await page.getByLabel("Confidentiality term, years").fill("4");
-    await page
-      .locator("fieldset", { hasText: "Party 1" })
-      .getByLabel("Company")
-      .fill("Northstar Labs, Inc.");
-    await page
-      .locator("fieldset", { hasText: "Party 2" })
-      .getByLabel("Company")
-      .fill("Harbor AI LLC");
-    await page.getByLabel("Governing law").fill("New York");
-    await page.getByLabel("Jurisdiction").fill("state and federal courts located in New York County, NY");
-    await page.getByLabel("MNDA modifications").fill("Residual knowledge clause excluded.");
-
     const preview = page.getByLabel("Mutual NDA preview");
+    await sendChatAnswer(page, ndaAnswers[0]);
     await expect(preview.getByText("Exploring a co-development agreement.")).toBeVisible();
+
+    await sendChatAnswer(page, ndaAnswers[1]);
     await expect(preview.getByText("July 8, 2026")).toBeVisible();
+
+    await sendChatAnswer(page, ndaAnswers[2]);
     await expect(preview.getByText("Expires 2 year(s) from Effective Date.")).toBeVisible();
+
+    await sendChatAnswer(page, ndaAnswers[3]);
     await expect(preview.getByText("4 year(s) from Effective Date.")).toBeVisible();
+
+    await sendChatAnswer(page, ndaAnswers[4]);
     await expect(preview.getByText("Northstar Labs, Inc.")).toBeVisible();
+
+    await sendChatAnswer(page, ndaAnswers[5]);
+    await sendChatAnswer(page, ndaAnswers[6]);
+    await sendChatAnswer(page, ndaAnswers[7]);
+    await sendChatAnswer(page, ndaAnswers[8]);
     await expect(preview.getByText("Harbor AI LLC")).toBeVisible();
+
+    await sendChatAnswer(page, ndaAnswers[9]);
+    await sendChatAnswer(page, ndaAnswers[10]);
+    await sendChatAnswer(page, ndaAnswers[11]);
+    await sendChatAnswer(page, ndaAnswers[12]);
     await expect(preview.getByText("New York", { exact: true })).toBeVisible();
+
+    await sendChatAnswer(page, ndaAnswers[13]);
+    await sendChatAnswer(page, ndaAnswers[14]);
     await expect(preview.getByText("Residual knowledge clause excluded.")).toBeVisible();
   });
 
-  test("keeps the PDF action available without mutating the form", async ({ page }) => {
+  test("shows confirmation and PDF download only after all fields are complete", async ({ page }) => {
     await enterPlatform(page);
 
+    await expect(page.getByRole("button", { name: "Download PDF" })).toHaveCount(0);
+    for (const answer of ndaAnswers) {
+      await sendChatAnswer(page, answer);
+    }
+
+    await expect(
+      page.getByText("All fields are complete. Review the preview before downloading."),
+    ).toBeVisible();
     const downloadButton = page.getByRole("button", { name: "Download PDF" });
     await expect(downloadButton).toBeEnabled();
-    await expect(page.getByLabel("Purpose")).toHaveValue(
-      "Evaluating whether to enter into a business relationship with the other party.",
+    await expect(page.getByLabel("NDA completion progress")).toHaveText(
+      "15 of 15 details collected",
     );
   });
 });

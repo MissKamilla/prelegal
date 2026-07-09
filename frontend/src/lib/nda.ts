@@ -34,6 +34,24 @@ export const initialNdaValues: NdaFormValues = {
   modifications: "None.",
 };
 
+export const emptyNdaValues: NdaFormValues = {
+  effectiveDate: "",
+  purpose: "",
+  partyOneName: "",
+  partyOneSigner: "",
+  partyOneTitle: "",
+  partyOneAddress: "",
+  partyTwoName: "",
+  partyTwoSigner: "",
+  partyTwoTitle: "",
+  partyTwoAddress: "",
+  mndaTermYears: "",
+  confidentialityTermYears: "",
+  governingLaw: "",
+  jurisdiction: "",
+  modifications: "",
+};
+
 export const standardTerms = [
   {
     title: "Introduction",
