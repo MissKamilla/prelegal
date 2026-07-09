@@ -3,114 +3,17 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import {
-  emptyNdaValues,
+  createEmptyDraftValues,
+  documentSections,
+  DraftValues,
+  findSupportedDocument,
   formatDate,
-  NdaFormValues,
-  standardTerms,
-} from "@/lib/nda";
+  getDraftValue,
+  suggestSupportedDocument,
+  supportedDocuments,
+  SupportedDocument,
+} from "@/lib/documents";
 import { FormEvent, useLayoutEffect, useRef, useState } from "react";
-
-type Field = {
-  key: keyof NdaFormValues;
-  label: string;
-  question: string;
-  section: "Agreement" | "Party 1" | "Party 2" | "Legal";
-};
-
-const fields: Field[] = [
-  {
-    key: "purpose",
-    label: "Purpose",
-    question: "What is the purpose of this Mutual NDA?",
-    section: "Agreement",
-  },
-  {
-    key: "effectiveDate",
-    label: "Effective date",
-    question: "What effective date should appear on the NDA? Use YYYY-MM-DD if you can.",
-    section: "Agreement",
-  },
-  {
-    key: "mndaTermYears",
-    label: "MNDA term, years",
-    question: "How many years should the MNDA remain in effect?",
-    section: "Agreement",
-  },
-  {
-    key: "confidentialityTermYears",
-    label: "Confidentiality term, years",
-    question: "How many years should confidentiality obligations survive?",
-    section: "Agreement",
-  },
-  {
-    key: "partyOneName",
-    label: "Company",
-    question: "What is Party 1's legal company name?",
-    section: "Party 1",
-  },
-  {
-    key: "partyOneSigner",
-    label: "Signer name",
-    question: "Who will sign for Party 1?",
-    section: "Party 1",
-  },
-  {
-    key: "partyOneTitle",
-    label: "Signer title",
-    question: "What is Party 1 signer's title?",
-    section: "Party 1",
-  },
-  {
-    key: "partyOneAddress",
-    label: "Notice address",
-    question: "What notice address or email should Party 1 use?",
-    section: "Party 1",
-  },
-  {
-    key: "partyTwoName",
-    label: "Company",
-    question: "What is Party 2's legal company name?",
-    section: "Party 2",
-  },
-  {
-    key: "partyTwoSigner",
-    label: "Signer name",
-    question: "Who will sign for Party 2?",
-    section: "Party 2",
-  },
-  {
-    key: "partyTwoTitle",
-    label: "Signer title",
-    question: "What is Party 2 signer's title?",
-    section: "Party 2",
-  },
-  {
-    key: "partyTwoAddress",
-    label: "Notice address",
-    question: "What notice address or email should Party 2 use?",
-    section: "Party 2",
-  },
-  {
-    key: "governingLaw",
-    label: "Governing law",
-    question: "Which state's law should govern the NDA?",
-    section: "Legal",
-  },
-  {
-    key: "jurisdiction",
-    label: "Jurisdiction",
-    question: "Which courts should have jurisdiction?",
-    section: "Legal",
-  },
-  {
-    key: "modifications",
-    label: "MNDA modifications",
-    question: 'Any modifications to the MNDA? You can answer "None."',
-    section: "Legal",
-  },
-];
-
-const sections: Field["section"][] = ["Agreement", "Party 1", "Party 2", "Legal"];
 
 type ChatMessage = {
   id: number;
@@ -123,29 +26,39 @@ type FakeUser = {
   displayName: string;
 };
 
+function supportedDocumentList() {
+  return supportedDocuments.map((document) => document.shortName).join(", ");
+}
+
+function initialMessages(): ChatMessage[] {
+  return [
+    {
+      id: 1,
+      role: "assistant",
+      content:
+        "Hi, I can help prepare a legal document from Prelegal's supported templates.",
+    },
+    {
+      id: 2,
+      role: "assistant",
+      content: `Which document do you need? I currently support: ${supportedDocumentList()}.`,
+    },
+  ];
+}
+
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<FakeUser | null>(null);
   const [loginEmail, setLoginEmail] = useState("demo@prelegal.example");
   const [displayName, setDisplayName] = useState("Demo User");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [values, setValues] = useState<NdaFormValues>(emptyNdaValues);
+  const [selectedDocument, setSelectedDocument] = useState<SupportedDocument | null>(null);
+  const [suggestedDocument, setSuggestedDocument] = useState<SupportedDocument | null>(null);
+  const [values, setValues] = useState<DraftValues>({});
   const [activeFieldIndex, setActiveFieldIndex] = useState(0);
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: 1,
-      role: "assistant",
-      content:
-        "Hi, I can help prepare a Mutual NDA. I will ask for the key details and update the draft after each answer.",
-    },
-    {
-      id: 2,
-      role: "assistant",
-      content: fields[0].question,
-    },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialMessages);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [termsPages, setTermsPages] = useState([standardTerms]);
+  const [termPages, setTermPages] = useState<SupportedDocument["templateSections"][]>([]);
   const pageRefs = useRef<Array<HTMLElement | null>>([]);
   const termsMeasureRef = useRef<HTMLElement>(null);
 
@@ -161,7 +74,8 @@ export default function Home() {
 
     function paginateTerms() {
       const measurePage = termsMeasureRef.current;
-      if (!measurePage) {
+      if (!measurePage || !selectedDocument) {
+        setTermPages([]);
         return;
       }
 
@@ -175,13 +89,13 @@ export default function Home() {
       const headingHeight = heading ? getOuterHeight(heading) : 0;
       const footerHeight = footer ? getOuterHeight(footer) : 0;
       const pageHeightLimit = availableHeight - headingHeight - footerHeight;
-      const nextPages: typeof standardTerms[] = [];
-      let currentPage: typeof standardTerms = [];
+      const nextPages: SupportedDocument["templateSections"][] = [];
+      let currentPage: SupportedDocument["templateSections"] = [];
       let currentHeight = 0;
 
       paragraphNodes.forEach((paragraph, index) => {
         const paragraphHeight = getOuterHeight(paragraph);
-        const term = standardTerms[index];
+        const term = selectedDocument.templateSections[index];
 
         if (currentPage.length > 0 && currentHeight + paragraphHeight > pageHeightLimit) {
           nextPages.push(currentPage);
@@ -197,7 +111,7 @@ export default function Home() {
         nextPages.push(currentPage);
       }
 
-      setTermsPages(nextPages.length > 0 ? nextPages : [standardTerms]);
+      setTermPages(nextPages.length > 0 ? nextPages : [selectedDocument.templateSections]);
     }
 
     paginateTerms();
@@ -207,46 +121,99 @@ export default function Home() {
     return () => {
       window.removeEventListener("resize", paginateTerms);
     };
-  }, []);
+  }, [selectedDocument]);
 
-  const completedFields = fields.filter((field) => values[field.key].trim()).length;
-  const isDraftComplete = completedFields === fields.length;
-  const activeField = fields[activeFieldIndex];
+  const completedFields = selectedDocument
+    ? selectedDocument.fields.filter((field) => values[field.key]?.trim()).length
+    : 0;
+  const totalFields = selectedDocument?.fields.length ?? 0;
+  const isDraftComplete = Boolean(selectedDocument && completedFields === totalFields);
+  const activeField = selectedDocument?.fields[activeFieldIndex];
 
-  function previewValue(key: keyof NdaFormValues, fallback: string) {
-    return values[key].trim() || fallback;
+  function addMessages(nextMessages: Omit<ChatMessage, "id">[]) {
+    setChatMessages((current) => [
+      ...current,
+      ...nextMessages.map((message, index) => ({
+        ...message,
+        id: current.length + index + 1,
+      })),
+    ]);
+  }
+
+  function chooseDocument(document: SupportedDocument, prefix?: string) {
+    setSelectedDocument(document);
+    setSuggestedDocument(null);
+    setValues(createEmptyDraftValues(document));
+    setActiveFieldIndex(0);
+    addMessages([
+      {
+        role: "assistant",
+        content: `${prefix ?? "Great."} We'll create a ${document.title}. ${document.fields[0].question}`,
+      },
+    ]);
+  }
+
+  function handleDocumentSelection(answer: string) {
+    const yesToSuggestion = suggestedDocument && /\b(yes|yeah|yep|ok|okay|sure|use it|that works)\b/i.test(answer);
+
+    if (yesToSuggestion) {
+      chooseDocument(suggestedDocument, "Got it.");
+      return;
+    }
+
+    const document = findSupportedDocument(answer);
+
+    if (document) {
+      chooseDocument(document);
+      return;
+    }
+
+    const suggestion = suggestSupportedDocument(answer);
+    setSuggestedDocument(suggestion);
+    addMessages([
+      {
+        role: "assistant",
+        content:
+          `I can't generate "${answer}" because it is not one of the supported templates. ` +
+          `The closest supported option is ${suggestion.title}. Would you like to use that instead?`,
+      },
+    ]);
   }
 
   function submitChatAnswer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const answer = chatInput.trim();
-    if (!answer || isDraftComplete || !activeField) {
+    if (!answer) {
+      return;
+    }
+
+    setChatInput("");
+    addMessages([{ role: "user", content: answer }]);
+
+    if (!selectedDocument) {
+      handleDocumentSelection(answer);
+      return;
+    }
+
+    if (isDraftComplete || !activeField) {
       return;
     }
 
     const nextFieldIndex = activeFieldIndex + 1;
-    const nextField = fields[nextFieldIndex];
+    const nextField = selectedDocument.fields[nextFieldIndex];
 
     setValues((current) => ({
       ...current,
       [activeField.key]: answer,
     }));
-    setChatInput("");
     setActiveFieldIndex(nextFieldIndex);
-    setChatMessages((current) => [
-      ...current,
+    addMessages([
       {
-        id: current.length + 1,
-        role: "user",
-        content: answer,
-      },
-      {
-        id: current.length + 2,
         role: "assistant",
         content: nextField
           ? `Got it. ${nextField.question}`
-          : "Thanks. All required NDA details are filled in. Please review the preview, then download the PDF when ready.",
+          : "Thanks. All required details are filled in. Please review the preview, then download the PDF when ready.",
       },
     ]);
   }
@@ -290,7 +257,7 @@ export default function Home() {
   async function downloadPdf() {
     const pages = pageRefs.current.filter((page): page is HTMLElement => Boolean(page));
 
-    if (!pages.length || isDownloading) {
+    if (!pages.length || isDownloading || !selectedDocument) {
       return;
     }
 
@@ -324,8 +291,9 @@ export default function Home() {
         );
       }
 
-      const fileParty = values.partyOneName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      pdf.save(`mutual-nda-${fileParty || "draft"}.pdf`);
+      const fileParty = (values.partyOneName ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const fileDocument = selectedDocument.id.replace(/[^a-z0-9]+/g, "-");
+      pdf.save(`${fileDocument}-${fileParty || "draft"}.pdf`);
     } finally {
       setIsDownloading(false);
     }
@@ -374,12 +342,12 @@ export default function Home() {
 
   return (
     <main className="app-shell">
-      <section className="editor-panel" aria-label="NDA details">
+      <section className="editor-panel" aria-label="Document details">
         <div className="brand-row">
           <span className="brand-mark">PL</span>
           <div>
             <p className="eyebrow">Prelegal</p>
-            <h1>Mutual NDA Creator</h1>
+            <h1>Legal Document Creator</h1>
           </div>
         </div>
 
@@ -387,11 +355,13 @@ export default function Home() {
           Signed in as <strong>{currentUser.displayName}</strong>
         </p>
 
-        <div className="chat-progress" aria-label="NDA completion progress">
-          {completedFields} of {fields.length} details collected
+        <div className="chat-progress" aria-label="Document completion progress">
+          {selectedDocument
+            ? `${completedFields} of ${totalFields} details collected`
+            : "Choose a supported document to begin"}
         </div>
 
-        <section className="chat-panel" aria-label="AI chat for Mutual NDA">
+        <section className="chat-panel" aria-label="AI chat for legal documents">
           <div className="chat-thread">
             {chatMessages.map((message) => (
               <div className={`chat-message ${message.role}`} key={message.id}>
@@ -411,7 +381,7 @@ export default function Home() {
           ) : (
             <form className="chat-form" onSubmit={submitChatAnswer}>
               <label htmlFor="chat-answer">
-                <span>{activeField.label}</span>
+                <span>{activeField?.label ?? "Document type"}</span>
                 <textarea
                   id="chat-answer"
                   value={chatInput}
@@ -428,175 +398,205 @@ export default function Home() {
           )}
         </section>
 
-        <section className="field-summary" aria-label="Collected NDA details">
-          {sections.map((section) => (
-            <div key={section}>
-              <h2>{section}</h2>
-              <dl>
-                {fields
-                  .filter((field) => field.section === section)
-                  .map((field) => (
-                    <div key={field.key}>
-                      <dt>{field.label}</dt>
-                      <dd>{values[field.key] || "Pending"}</dd>
-                    </div>
-                  ))}
-              </dl>
-            </div>
-          ))}
+        <section className="field-summary" aria-label="Collected document details">
+          <div>
+            <h2>Supported Templates</h2>
+            <ul className="document-list">
+              {supportedDocuments.map((document) => (
+                <li key={document.id}>{document.shortName}</li>
+              ))}
+            </ul>
+          </div>
+
+          {selectedDocument ? (
+            <>
+              <div>
+                <h2>Selected Document</h2>
+                <dl>
+                  <div>
+                    <dt>Template</dt>
+                    <dd>{selectedDocument.title}</dd>
+                  </div>
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{selectedDocument.filename}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              {documentSections.map((section) => (
+                <div key={section}>
+                  <h2>{section}</h2>
+                  <dl>
+                    {selectedDocument.fields
+                      .filter((field) => field.section === section)
+                      .map((field) => (
+                        <div key={field.key}>
+                          <dt>{field.label}</dt>
+                          <dd>{values[field.key] || "Pending"}</dd>
+                        </div>
+                      ))}
+                  </dl>
+                </div>
+              ))}
+            </>
+          ) : null}
         </section>
       </section>
 
-      <section className="preview-panel" aria-label="Mutual NDA preview">
+      <section className="preview-panel" aria-label="Legal document preview">
         <div className="document-stack">
-          <article className="document document-page pagination-measure" ref={termsMeasureRef}>
-            <section>
-              <h3>Standard Terms</h3>
-              {standardTerms.map((term, index) => (
-                <p data-term-index={index} key={term.title}>
-                  <strong>
-                    {index + 1}. {term.title}.
-                  </strong>{" "}
-                  {term.body}
-                </p>
-              ))}
-            </section>
-            <footer>
-              Common Paper Mutual Non-Disclosure Agreement Version 1.0 is free to use under CC BY
-              4.0. This prototype prepares a working draft and is not legal advice.
-            </footer>
-          </article>
-
-          <article
-            className="document document-page"
-            ref={(node) => {
-              pageRefs.current[0] = node;
-            }}
-          >
-            <header>
-              <p>Common Paper Mutual NDA Draft</p>
-              <h2>Mutual Non-Disclosure Agreement</h2>
-            </header>
-
-            <section>
-              <h3>Cover Page</h3>
-              <dl className="summary-grid">
-                <div>
-                  <dt>Purpose</dt>
-                  <dd>{previewValue("purpose", "[Purpose]")}</dd>
-                </div>
-                <div>
-                  <dt>Effective Date</dt>
-                  <dd>{formatDate(values.effectiveDate)}</dd>
-                </div>
-                <div>
-                  <dt>MNDA Term</dt>
-                  <dd>
-                    Expires {previewValue("mndaTermYears", "[number]")} year(s) from Effective
-                    Date.
-                  </dd>
-                </div>
-                <div>
-                  <dt>Term of Confidentiality</dt>
-                  <dd>
-                    {previewValue("confidentialityTermYears", "[number]")} year(s) from Effective
-                    Date.
-                  </dd>
-                </div>
-                <div>
-                  <dt>Governing Law</dt>
-                  <dd>{previewValue("governingLaw", "[state]")}</dd>
-                </div>
-                <div>
-                  <dt>Jurisdiction</dt>
-                  <dd>{previewValue("jurisdiction", "[courts]")}</dd>
-                </div>
-                <div>
-                  <dt>Modifications</dt>
-                  <dd>{previewValue("modifications", "None.")}</dd>
-                </div>
-              </dl>
-            </section>
-
-            <section>
-              <h3>Parties</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Party 1</th>
-                    <th>Party 2</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th>Company</th>
-                    <td>{previewValue("partyOneName", "[Party 1 company]")}</td>
-                    <td>{previewValue("partyTwoName", "[Party 2 company]")}</td>
-                  </tr>
-                  <tr>
-                    <th>Print Name</th>
-                    <td>{previewValue("partyOneSigner", "[Party 1 signer]")}</td>
-                    <td>{previewValue("partyTwoSigner", "[Party 2 signer]")}</td>
-                  </tr>
-                  <tr>
-                    <th>Title</th>
-                    <td>{previewValue("partyOneTitle", "[Party 1 title]")}</td>
-                    <td>{previewValue("partyTwoTitle", "[Party 2 title]")}</td>
-                  </tr>
-                  <tr>
-                    <th>Notice Address</th>
-                    <td>{previewValue("partyOneAddress", "[Party 1 notice address]")}</td>
-                    <td>{previewValue("partyTwoAddress", "[Party 2 notice address]")}</td>
-                  </tr>
-                  <tr>
-                    <th>Signature</th>
-                    <td />
-                    <td />
-                  </tr>
-                  <tr>
-                    <th>Date</th>
-                    <td />
-                    <td />
-                  </tr>
-                </tbody>
-              </table>
-            </section>
-          </article>
-
-          {termsPages.map((terms, pageIndex) => (
-            <article
-              className="document document-page"
-              key={pageIndex}
-              ref={(node) => {
-                pageRefs.current[pageIndex + 1] = node;
-              }}
-            >
-              <section>
-                <h3>{pageIndex === 0 ? "Standard Terms" : "Standard Terms Continued"}</h3>
-                {terms.map((term, termIndex) => (
-                  <p key={term.title}>
-                    <strong>
-                      {termsPages
-                        .slice(0, pageIndex)
-                        .reduce((total, page) => total + page.length, 0) +
-                        termIndex +
-                        1}
-                      . {term.title}.
-                    </strong>{" "}
-                    {term.body}
-                  </p>
-                ))}
-              </section>
-
-              {pageIndex === termsPages.length - 1 ? (
+          {selectedDocument ? (
+            <>
+              <article className="document document-page pagination-measure" ref={termsMeasureRef}>
+                <section>
+                  <h3>Template Terms</h3>
+                  {selectedDocument.templateSections.map((term, index) => (
+                    <p data-term-index={index} key={term.title}>
+                      <strong>
+                        {index + 1}. {term.title}.
+                      </strong>{" "}
+                      {term.body}
+                    </p>
+                  ))}
+                </section>
                 <footer>
-                  Common Paper Mutual Non-Disclosure Agreement Version 1.0 is free to use under
-                  CC BY 4.0. This prototype prepares a working draft and is not legal advice.
+                  Template source: {selectedDocument.filename}. This prototype prepares a
+                  working draft and is not legal advice.
                 </footer>
-              ) : null}
+              </article>
+
+              <article
+                className="document document-page"
+                ref={(node) => {
+                  pageRefs.current[0] = node;
+                }}
+              >
+                <header>
+                  <p>Prelegal Draft</p>
+                  <h2>{selectedDocument.title}</h2>
+                </header>
+
+                <section>
+                  <h3>Draft Details</h3>
+                  <dl className="summary-grid">
+                    {selectedDocument.fields.map((field) => (
+                      <div key={field.key}>
+                        <dt>{field.label}</dt>
+                        <dd>
+                          {field.key === "effectiveDate"
+                            ? formatDate(values[field.key])
+                            : getDraftValue(values, field)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+
+                <section>
+                  <h3>Signature Blocks</h3>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Field</th>
+                        <th>Party 1</th>
+                        <th>Party 2</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th>Company</th>
+                        <td>{values.partyOneName || "[Party 1 legal name]"}</td>
+                        <td>{values.partyTwoName || "[Party 2 legal name]"}</td>
+                      </tr>
+                      <tr>
+                        <th>Print Name</th>
+                        <td>{values.partyOneSigner || "[Party 1 signer]"}</td>
+                        <td>{values.partyTwoSigner || "[Party 2 signer]"}</td>
+                      </tr>
+                      <tr>
+                        <th>Title</th>
+                        <td>{values.partyOneTitle || "[Party 1 signer title]"}</td>
+                        <td>{values.partyTwoTitle || "[Party 2 signer title]"}</td>
+                      </tr>
+                      <tr>
+                        <th>Notice Address</th>
+                        <td>{values.partyOneAddress || "[Party 1 notice address]"}</td>
+                        <td>{values.partyTwoAddress || "[Party 2 notice address]"}</td>
+                      </tr>
+                      <tr>
+                        <th>Signature</th>
+                        <td />
+                        <td />
+                      </tr>
+                      <tr>
+                        <th>Date</th>
+                        <td />
+                        <td />
+                      </tr>
+                    </tbody>
+                  </table>
+                </section>
+              </article>
+
+              {termPages.map((terms, pageIndex) => (
+                <article
+                  className="document document-page"
+                  key={pageIndex}
+                  ref={(node) => {
+                    pageRefs.current[pageIndex + 1] = node;
+                  }}
+                >
+                  <section>
+                    <h3>{pageIndex === 0 ? "Template Terms" : "Template Terms Continued"}</h3>
+                    {terms.map((term, termIndex) => (
+                      <p key={term.title}>
+                        <strong>
+                          {termPages
+                            .slice(0, pageIndex)
+                            .reduce((total, page) => total + page.length, 0) +
+                            termIndex +
+                            1}
+                          . {term.title}.
+                        </strong>{" "}
+                        {term.body}
+                      </p>
+                    ))}
+                  </section>
+
+                  {pageIndex === termPages.length - 1 ? (
+                    <footer>
+                      Template source: {selectedDocument.filename}. This prototype prepares a
+                      working draft and is not legal advice.
+                    </footer>
+                  ) : null}
+                </article>
+              ))}
+
+            </>
+          ) : (
+            <article className="document document-page empty-preview">
+              <header>
+                <p>Prelegal Draft</p>
+                <h2>Choose a document</h2>
+              </header>
+              <section>
+                <h3>Supported Templates</h3>
+                <p>
+                  Start in the chat by asking for one of the supported legal document types. If
+                  the requested document is unsupported, the assistant will offer the closest
+                  available template.
+                </p>
+                <ul>
+                  {supportedDocuments.map((document) => (
+                    <li key={document.id}>
+                      <strong>{document.title}.</strong> {document.description}
+                    </li>
+                  ))}
+                </ul>
+              </section>
             </article>
-          ))}
+          )}
         </div>
       </section>
     </main>

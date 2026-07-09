@@ -1,6 +1,6 @@
 # Manual Test Checklist
 
-Use this checklist before releasing changes to the Mutual NDA creator. Record the browser,
+Use this checklist before releasing changes to the legal document creator. Record the browser,
 OS, date, tester, and pass/fail result for each scenario.
 
 ## Environment
@@ -15,25 +15,32 @@ OS, date, tester, and pass/fail result for each scenario.
 1. Confirm the page loads without console errors.
 2. Confirm the fake login screen shows the Prelegal brand and `Sign in to Prelegal`.
 3. Click `Enter platform`.
-4. Confirm the left editor shows the Prelegal brand, `Mutual NDA Creator` heading, the chat
-   greeting, and the first Mutual NDA question.
-5. Confirm the right preview shows `Mutual Non-Disclosure Agreement`, `Cover Page`,
-   `Parties`, and `Standard Terms`.
-6. Confirm the preview starts with placeholders for unfilled NDA details.
+4. Confirm the left editor shows the Prelegal brand, `Legal Document Creator` heading, and
+   the document picker chat prompt.
+5. Confirm the supported template list includes Mutual NDA, Cloud Service Agreement, DPA,
+   PSA, BAA, Software License Agreement, Pilot Agreement, and AI Addendum.
+6. Confirm the right preview starts with `Choose a document` and explains supported templates.
 
 ## AI Chat Editing
 
-1. Answer the opening purpose question with a long multi-sentence value and confirm it appears
-   in the preview immediately after sending.
-2. Answer the effective date question with `2026-07-08` and confirm the preview shows
+1. Ask for `Cloud Service Agreement` and confirm the preview switches to that title.
+2. Confirm the progress indicator shows the number of details required for the selected document.
+3. Answer the effective date question with `2026-07-08` and confirm the preview shows
    `July 8, 2026`.
-3. Answer the MNDA term and confidentiality term questions; confirm both preview values update
-   immediately after their answers.
-4. Answer every Party 1 and Party 2 question; confirm the party table updates without stale
+4. Answer every Party 1 and Party 2 question; confirm the signature table updates without stale
    values.
-5. Answer the `Governing law`, `Jurisdiction`, and `MNDA modifications` questions; confirm the
-   legal summary updates.
-6. Confirm the progress indicator advances after each answer.
+5. Answer each business-term question for the selected document; confirm each value appears in
+   the preview immediately after sending.
+6. Answer the `Governing law`, `Jurisdiction`, and special-terms questions; confirm the legal
+   summary updates.
+7. Confirm the progress indicator advances after each answer.
+
+## Unsupported Documents
+
+1. Refresh the app and ask for an unsupported document such as `employment offer letter`.
+2. Confirm the chat explains that the requested document cannot be generated.
+3. Confirm the chat offers the closest supported template, such as Professional Services Agreement.
+4. Reply `yes` and confirm the preview switches to the suggested supported document.
 
 ## PDF Download
 
@@ -41,8 +48,8 @@ OS, date, tester, and pass/fail result for each scenario.
 2. After the final answer, confirm the completion message and `Download PDF` button appear.
 3. Click `Download PDF`.
 4. Confirm the button changes to `Preparing PDF...` while the file is generated.
-5. Confirm a PDF downloads with a filename starting with `mutual-nda-`.
-6. Open the PDF and confirm it contains the cover page, party table, all standard terms,
+5. Confirm a PDF downloads with a filename based on the selected document type.
+6. Open the PDF and confirm it contains the draft details, signature table, template terms,
    attribution, and the `not legal advice` disclaimer.
 7. Confirm multi-page output has no clipped text, overlapping sections, or missing footer.
 
@@ -56,5 +63,5 @@ OS, date, tester, and pass/fail result for each scenario.
 ## Regression Checks
 
 1. Refresh after answering questions and confirm the chat intentionally resets to a blank draft.
-2. Resize the browser several times and confirm standard terms remain ordered and visible.
+2. Resize the browser several times and confirm template terms remain ordered and visible.
 3. Run `npm run typecheck`, `npm run lint`, `npm run test:unit`, and `npm run test:e2e`.
