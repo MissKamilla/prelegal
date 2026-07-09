@@ -5,13 +5,15 @@
 This is a SaaS product to allow users to draft legal agreements based on templates in the templates directory.
 
 The product currently uses a chat-like interface to establish what document the user wants and how to fill in the fields.
-Important: this is not connected to a real AI/LLM yet. The current chat is scripted with predefined questions, simple keyword matching, and deterministic field filling. A real AI integration should be added in a future task.
+Important: this is not connected to a real AI/LLM yet. The current chat is scripted with predefined questions, simple keyword matching, and deterministic field filling.
 
 The available documents are covered in the catalog.json file in the project root, included here:
 
 @catalog.json
 
-Current product scope: the application supports all document types listed in `catalog.json` through a guided scripted chat flow.
+Current product scope: the application supports all document types listed in `catalog.json` through a guided scripted chat flow. Users can sign up, sign in, generate draft documents, save completed drafts, and reopen prior drafts while the temporary backend database is alive.
+
+Next task: connect a real AI/LLM to the chat. The AI should understand freeform user intent, choose or suggest document types, ask adaptive follow-up questions, extract field values from natural answers, and use the template contents more directly.
 
 ## Development process
 
@@ -27,8 +29,8 @@ When instructed to build a feature:
 The entire project should be packaged into a Docker container.  
 The backend should be in backend/ and be a uv project, using FastAPI.  
 The frontend should be in frontend/  
-The database should use SQLLite and be created from scratch each time the Docker container is brought up,
-allowing for a users table with sign up and sign in.  
+The database should use SQLite and be created from scratch each time the Docker container is brought up,
+allowing for users, sign up/sign in, and saved generated documents.  
 Consider statically building the frontend and serving it via FastAPI, if that will work.
 
 There should be scripts in scripts/ for:
@@ -83,3 +85,21 @@ PL-6 expanded document support:
 - Added unit tests for document matching/fallback behavior and updated e2e tests for supported and unsupported document flows.
 - The implementation does not parse the markdown templates directly and does not use a real AI model yet.
 - Future work: connect a real AI/LLM so the chat can understand freeform user intent, ask adaptive follow-up questions, extract fields from natural answers, and work more directly from the template contents.
+
+PL-7 added multi-user polish and saved documents:
+
+- Backend users now support email/password sign up and sign in with PBKDF2 password hashing.
+- The temporary SQLite database now stores generated documents by user until the server restarts.
+- Backend document APIs allow saving, listing, and loading a user's generated drafts.
+- The frontend account screen now has sign in and sign up modes instead of only fake login.
+- Completed drafts are saved automatically and appear in a `Your Documents` list.
+- Users can reopen a previously saved draft from the current temporary database.
+- The UI includes a visible legal-review disclaimer: documents are drafts and should be reviewed by a qualified lawyer before use.
+- The Next-only development/e2e mode has a localStorage fallback for auth and saved documents because it does not run the FastAPI backend.
+- The production/Docker path uses the FastAPI + temporary SQLite APIs.
+
+Final current state:
+
+- The app is a working SaaS-style prototype with account creation, sign in, scripted document creation, draft preview, PDF download, saved document history, and legal-review disclaimers.
+- The database is intentionally temporary and resets when the backend restarts.
+- The chat is still not real AI. It is scripted and should be replaced or enhanced with a real AI/LLM integration next.
