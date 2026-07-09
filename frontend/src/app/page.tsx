@@ -3,6 +3,7 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import {
+  buildDocumentMarkdown,
   createEmptyDraftValues,
   documentSections,
   DraftValues,
@@ -22,8 +23,27 @@ type ChatMessage = {
 };
 
 type FakeUser = {
+  id: number;
   email: string;
   displayName: string;
+};
+
+type AuthMode = "signin" | "signup";
+
+type SavedDocumentSummary = {
+  id: number;
+  title: string;
+  documentType: string;
+  createdAt: string;
+};
+
+type SavedDocument = SavedDocumentSummary & {
+  content: string;
+  values: DraftValues;
+};
+
+type LocalAccount = FakeUser & {
+  password: string;
 };
 
 function supportedDocumentList() {
@@ -46,11 +66,95 @@ function initialMessages(): ChatMessage[] {
   ];
 }
 
+function localStorageKey(name: string) {
+  return `prelegal:${name}`;
+}
+
+function readLocalJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  const rawValue = window.localStorage.getItem(localStorageKey(key));
+  return rawValue ? (JSON.parse(rawValue) as T) : fallback;
+}
+
+function writeLocalJson<T>(key: string, value: T) {
+  window.localStorage.setItem(localStorageKey(key), JSON.stringify(value));
+}
+
+function localAuthenticate(
+  mode: AuthMode,
+  email: string,
+  displayName: string,
+  password: string,
+) {
+  const accounts = readLocalJson<LocalAccount[]>("accounts", []);
+  const existingAccount = accounts.find((account) => account.email === email.toLowerCase());
+
+  if (mode === "signin") {
+    if (!existingAccount || existingAccount.password !== password) {
+      throw new Error("Invalid email or password");
+    }
+
+    return existingAccount;
+  }
+
+  if (existingAccount) {
+    throw new Error("Email is already registered");
+  }
+
+  const user = {
+    id: Date.now(),
+    email: email.toLowerCase(),
+    displayName,
+    password,
+  };
+  writeLocalJson("accounts", [...accounts, user]);
+  return user;
+}
+
+function saveLocalDocument(
+  userId: number,
+  document: SupportedDocument,
+  values: DraftValues,
+): SavedDocument {
+  const savedDocuments = readLocalJson<SavedDocument[]>(`document-details:${userId}`, []);
+  const savedDocument: SavedDocument = {
+    id: Date.now(),
+    title: document.title,
+    documentType: document.id,
+    createdAt: new Date().toISOString(),
+    content: buildDocumentMarkdown(document, values),
+    values,
+  };
+  const nextDocuments = [savedDocument, ...savedDocuments];
+
+  writeLocalJson(`document-details:${userId}`, nextDocuments);
+  writeLocalJson(
+    `documents:${userId}`,
+    nextDocuments.map(({ id, title, documentType, createdAt }) => ({
+      id,
+      title,
+      documentType,
+      createdAt,
+    })),
+  );
+
+  return savedDocument;
+}
+
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<FakeUser | null>(null);
   const [loginEmail, setLoginEmail] = useState("demo@prelegal.example");
   const [displayName, setDisplayName] = useState("Demo User");
+  const [password, setPassword] = useState("password123");
+  const [authMode, setAuthMode] = useState<AuthMode>("signin");
+  const [authError, setAuthError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [savedDocuments, setSavedDocuments] = useState<SavedDocumentSummary[]>([]);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [savedDocumentId, setSavedDocumentId] = useState<number | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<SupportedDocument | null>(null);
   const [suggestedDocument, setSuggestedDocument] = useState<SupportedDocument | null>(null);
   const [values, setValues] = useState<DraftValues>({});
@@ -130,6 +234,21 @@ export default function Home() {
   const isDraftComplete = Boolean(selectedDocument && completedFields === totalFields);
   const activeField = selectedDocument?.fields[activeFieldIndex];
 
+  async function loadSavedDocuments(userId: number) {
+    try {
+      const response = await fetch(`/api/users/${userId}/documents`);
+      if (!response.ok) {
+        setSavedDocuments(readLocalJson<SavedDocumentSummary[]>(`documents:${userId}`, []));
+        return;
+      }
+
+      const result = (await response.json()) as { documents?: SavedDocumentSummary[] };
+      setSavedDocuments(result.documents ?? []);
+    } catch {
+      setSavedDocuments(readLocalJson<SavedDocumentSummary[]>(`documents:${userId}`, []));
+    }
+  }
+
   function addMessages(nextMessages: Omit<ChatMessage, "id">[]) {
     setChatMessages((current) => [
       ...current,
@@ -145,6 +264,8 @@ export default function Home() {
     setSuggestedDocument(null);
     setValues(createEmptyDraftValues(document));
     setActiveFieldIndex(0);
+    setSavedDocumentId(null);
+    setSaveStatus("");
     addMessages([
       {
         role: "assistant",
@@ -202,11 +323,12 @@ export default function Home() {
 
     const nextFieldIndex = activeFieldIndex + 1;
     const nextField = selectedDocument.fields[nextFieldIndex];
-
-    setValues((current) => ({
-      ...current,
+    const nextValues = {
+      ...values,
       [activeField.key]: answer,
-    }));
+    };
+
+    setValues(nextValues);
     setActiveFieldIndex(nextFieldIndex);
     addMessages([
       {
@@ -216,42 +338,159 @@ export default function Home() {
           : "Thanks. All required details are filled in. Please review the preview, then download the PDF when ready.",
       },
     ]);
+
+    if (!nextField) {
+      void saveDocument(nextValues);
+    }
   }
 
-  async function fakeLogin(event: FormEvent<HTMLFormElement>) {
+  async function authenticate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const fallbackUser = {
-      email: loginEmail,
-      displayName,
-    };
+    setAuthError("");
 
     setIsLoggingIn(true);
 
     try {
-      const response = await fetch("/api/fake-login", {
+      const response = await fetch(authMode === "signin" ? "/api/signin" : "/api/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          authMode === "signin"
+            ? {
+                email: loginEmail,
+                password,
+              }
+            : {
+                email: loginEmail,
+                display_name: displayName,
+                password,
+              },
+        ),
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          const user = localAuthenticate(authMode, loginEmail, displayName, password);
+          setCurrentUser(user);
+          await loadSavedDocuments(user.id);
+          return;
+        }
+
+        const result = (await response.json()) as { detail?: string };
+        setAuthError(result.detail ?? "Unable to sign in");
+        return;
+      }
+
+      const result = (await response.json()) as { user?: FakeUser };
+      if (result.user) {
+        setCurrentUser(result.user);
+        await loadSavedDocuments(result.user.id);
+      }
+    } catch {
+      try {
+        const user = localAuthenticate(authMode, loginEmail, displayName, password);
+        setCurrentUser(user);
+        await loadSavedDocuments(user.id);
+      } catch (error) {
+        setAuthError(error instanceof Error ? error.message : "Unable to sign in");
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }
+
+  async function saveDocument(nextValues: DraftValues = values) {
+    if (!currentUser || !selectedDocument || savedDocumentId) {
+      return;
+    }
+
+    setSaveStatus("Saving draft...");
+
+    try {
+      const response = await fetch("/api/documents", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: loginEmail,
-          display_name: displayName,
+          user_id: currentUser.id,
+          title: selectedDocument.title,
+          document_type: selectedDocument.id,
+          content: buildDocumentMarkdown(selectedDocument, nextValues),
+          values: nextValues,
         }),
       });
 
       if (!response.ok) {
-        setCurrentUser(fallbackUser);
+        if (response.status === 404) {
+          const localDocument = saveLocalDocument(currentUser.id, selectedDocument, nextValues);
+          setSavedDocumentId(localDocument.id);
+          setSaveStatus("Draft saved to your documents.");
+          await loadSavedDocuments(currentUser.id);
+          return;
+        }
+
+        setSaveStatus("Draft was not saved.");
         return;
       }
 
-      const result = (await response.json()) as { user?: FakeUser };
-      setCurrentUser(result.user ?? fallbackUser);
+      const result = (await response.json()) as { document?: SavedDocument };
+      if (result.document) {
+        setSavedDocumentId(result.document.id);
+        setSaveStatus("Draft saved to your documents.");
+        await loadSavedDocuments(currentUser.id);
+      }
     } catch {
-      setCurrentUser(fallbackUser);
-    } finally {
-      setIsLoggingIn(false);
+      const localDocument = saveLocalDocument(currentUser.id, selectedDocument, nextValues);
+      setSavedDocumentId(localDocument.id);
+      setSaveStatus("Draft saved to your documents.");
+      await loadSavedDocuments(currentUser.id);
     }
+  }
+
+  async function openSavedDocument(documentId: number) {
+    if (!currentUser) {
+      return;
+    }
+
+    let savedDocument: SavedDocument | undefined;
+
+    try {
+      const response = await fetch(`/api/users/${currentUser.id}/documents/${documentId}`);
+      if (response.ok) {
+        const result = (await response.json()) as { document?: SavedDocument };
+        savedDocument = result.document;
+      }
+    } catch {
+      savedDocument = undefined;
+    }
+
+    savedDocument ??= readLocalJson<SavedDocument[]>(`document-details:${currentUser.id}`, []).find(
+      (document) => document.id === documentId,
+    );
+
+    const document = supportedDocuments.find((item) => item.id === savedDocument?.documentType);
+
+    if (!savedDocument || !document) {
+      return;
+    }
+
+    setSelectedDocument(document);
+    setSuggestedDocument(null);
+    setValues(savedDocument.values);
+    setActiveFieldIndex(document.fields.length);
+    setSavedDocumentId(savedDocument.id);
+    setSaveStatus("Loaded saved draft.");
+    setChatMessages([
+      ...initialMessages(),
+      {
+        id: 3,
+        role: "assistant",
+        content: `Loaded your saved ${document.title} from ${savedDocument.createdAt}.`,
+      },
+    ]);
   }
 
   async function downloadPdf() {
@@ -302,16 +541,41 @@ export default function Home() {
   if (!currentUser) {
     return (
       <main className="login-shell">
-        <section className="login-panel" aria-label="Fake login">
+        <section className="login-panel" aria-label="Account access">
           <div className="brand-row">
             <span className="brand-mark">PL</span>
             <div>
               <p className="eyebrow">Prelegal</p>
-              <h1>Sign in to Prelegal</h1>
+              <h1>{authMode === "signin" ? "Sign in to Prelegal" : "Create your account"}</h1>
             </div>
           </div>
 
-          <form className="login-form" onSubmit={fakeLogin}>
+          <div className="auth-tabs" role="tablist" aria-label="Authentication mode">
+            <button
+              aria-selected={authMode === "signin"}
+              onClick={() => {
+                setAuthMode("signin");
+                setAuthError("");
+              }}
+              role="tab"
+              type="button"
+            >
+              Sign in
+            </button>
+            <button
+              aria-selected={authMode === "signup"}
+              onClick={() => {
+                setAuthMode("signup");
+                setAuthError("");
+              }}
+              role="tab"
+              type="button"
+            >
+              Sign up
+            </button>
+          </div>
+
+          <form className="login-form" onSubmit={authenticate}>
             <label>
               <span>Email</span>
               <input
@@ -322,17 +586,36 @@ export default function Home() {
               />
             </label>
 
+            {authMode === "signup" ? (
+              <label>
+                <span>Display name</span>
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  required
+                />
+              </label>
+            ) : null}
+
             <label>
-              <span>Display name</span>
+              <span>Password</span>
               <input
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
+                minLength={6}
+                onChange={(event) => setPassword(event.target.value)}
                 required
+                type="password"
+                value={password}
               />
             </label>
 
+            {authError ? <p className="form-error">{authError}</p> : null}
+
             <button type="submit" disabled={isLoggingIn}>
-              {isLoggingIn ? "Entering..." : "Enter platform"}
+              {isLoggingIn
+                ? "Working..."
+                : authMode === "signin"
+                  ? "Sign in"
+                  : "Create account"}
             </button>
           </form>
         </section>
@@ -355,6 +638,10 @@ export default function Home() {
           Signed in as <strong>{currentUser.displayName}</strong>
         </p>
 
+        <div className="legal-disclaimer">
+          Documents are draft materials only and should be reviewed by a qualified lawyer before use.
+        </div>
+
         <div className="chat-progress" aria-label="Document completion progress">
           {selectedDocument
             ? `${completedFields} of ${totalFields} details collected`
@@ -374,6 +661,7 @@ export default function Home() {
           {isDraftComplete ? (
             <div className="complete-panel">
               <p>All fields are complete. Review the preview before downloading.</p>
+              {saveStatus ? <p>{saveStatus}</p> : null}
               <button type="button" onClick={downloadPdf} disabled={isDownloading}>
                 {isDownloading ? "Preparing PDF..." : "Download PDF"}
               </button>
@@ -399,6 +687,24 @@ export default function Home() {
         </section>
 
         <section className="field-summary" aria-label="Collected document details">
+          <div>
+            <h2>Your Documents</h2>
+            {savedDocuments.length ? (
+              <ul className="saved-document-list">
+                {savedDocuments.map((document) => (
+                  <li key={document.id}>
+                    <button type="button" onClick={() => void openSavedDocument(document.id)}>
+                      <span>{document.title}</span>
+                      <small>{document.createdAt}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">No saved documents yet.</p>
+            )}
+          </div>
+
           <div>
             <h2>Supported Templates</h2>
             <ul className="document-list">
@@ -462,7 +768,7 @@ export default function Home() {
                 </section>
                 <footer>
                   Template source: {selectedDocument.filename}. This prototype prepares a
-                  working draft and is not legal advice.
+                  working draft and requires legal review before use.
                 </footer>
               </article>
 
@@ -567,7 +873,7 @@ export default function Home() {
                   {pageIndex === termPages.length - 1 ? (
                     <footer>
                       Template source: {selectedDocument.filename}. This prototype prepares a
-                      working draft and is not legal advice.
+                      working draft and requires legal review before use.
                     </footer>
                   ) : null}
                 </article>

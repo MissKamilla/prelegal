@@ -13,13 +13,20 @@ OS, date, tester, and pass/fail result for each scenario.
 ## Smoke Test
 
 1. Confirm the page loads without console errors.
-2. Confirm the fake login screen shows the Prelegal brand and `Sign in to Prelegal`.
-3. Click `Enter platform`.
+2. Confirm the account screen shows the Prelegal brand, `Sign in to Prelegal`, and sign in/sign up tabs.
+3. Switch to `Sign up`, create an account, and confirm the app opens.
 4. Confirm the left editor shows the Prelegal brand, `Legal Document Creator` heading, and
    the document picker chat prompt.
 5. Confirm the supported template list includes Mutual NDA, Cloud Service Agreement, DPA,
    PSA, BAA, Software License Agreement, Pilot Agreement, and AI Addendum.
 6. Confirm the right preview starts with `Choose a document` and explains supported templates.
+7. Confirm the draft/legal-review disclaimer is visible.
+
+## Authentication
+
+1. Sign up with a new email, display name, and password.
+2. Refresh the app and sign in with the same email and password.
+3. Confirm wrong passwords show an error and do not enter the app.
 
 ## AI Chat Editing
 
@@ -34,6 +41,13 @@ OS, date, tester, and pass/fail result for each scenario.
 6. Answer the `Governing law`, `Jurisdiction`, and special-terms questions; confirm the legal
    summary updates.
 7. Confirm the progress indicator advances after each answer.
+
+## Saved Documents
+
+1. Complete all questions for a supported document.
+2. Confirm the completion state says the draft was saved.
+3. Confirm the document appears under `Your Documents`.
+4. Click the saved document and confirm the preview reloads with the saved values.
 
 ## Unsupported Documents
 
@@ -50,7 +64,7 @@ OS, date, tester, and pass/fail result for each scenario.
 4. Confirm the button changes to `Preparing PDF...` while the file is generated.
 5. Confirm a PDF downloads with a filename based on the selected document type.
 6. Open the PDF and confirm it contains the draft details, signature table, template terms,
-   attribution, and the `not legal advice` disclaimer.
+   attribution, and the legal-review disclaimer.
 7. Confirm multi-page output has no clipped text, overlapping sections, or missing footer.
 
 ## Responsive Layout
@@ -62,6 +76,6 @@ OS, date, tester, and pass/fail result for each scenario.
 
 ## Regression Checks
 
-1. Refresh after answering questions and confirm the chat intentionally resets to a blank draft.
+1. Restart the backend and confirm the temporary database resets.
 2. Resize the browser several times and confirm template terms remain ordered and visible.
 3. Run `npm run typecheck`, `npm run lint`, `npm run test:unit`, and `npm run test:e2e`.

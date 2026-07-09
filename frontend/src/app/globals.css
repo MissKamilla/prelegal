@@ -124,10 +124,49 @@ button:disabled {
   gap: 16px;
 }
 
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.auth-tabs button {
+  background: var(--soft);
+  color: var(--accent-strong);
+}
+
+.auth-tabs button[aria-selected="true"] {
+  background: var(--accent);
+  color: white;
+}
+
+.form-error {
+  margin: 0;
+  border: 1px solid #d89191;
+  border-radius: 8px;
+  background: #fff4f4;
+  color: #8a2424;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .platform-user {
   margin: 16px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.legal-disclaimer {
+  margin: 16px 0 0;
+  border: 1px solid #d7c67a;
+  border-radius: 8px;
+  background: #fff9db;
+  color: #5f4b00;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .chat-progress {
@@ -228,6 +267,43 @@ button:disabled {
   padding-left: 18px;
   color: var(--ink);
   font-size: 0.9rem;
+}
+
+.saved-document-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.saved-document-list button {
+  display: grid;
+  min-height: auto;
+  gap: 4px;
+  background: #fbfcfb;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.saved-document-list button:hover {
+  background: var(--soft);
+}
+
+.saved-document-list span {
+  font-weight: 800;
+}
+
+.saved-document-list small,
+.empty-state {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.empty-state {
+  margin: 0;
 }
 
 form {

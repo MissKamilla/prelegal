@@ -1,9 +1,15 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Page, test, TestInfo } from "@playwright/test";
 
-async function enterPlatform(page: Page) {
+async function enterPlatform(page: Page, testInfo: TestInfo) {
+  const email = `user-${testInfo.workerIndex}-${Date.now()}@example.com`;
+
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in to Prelegal" })).toBeVisible();
-  await page.getByRole("button", { name: "Enter platform" }).click();
+  await page.getByRole("tab", { name: "Sign up" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Display name").fill("Test User");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Legal Document Creator" })).toBeVisible();
 }
 
@@ -32,12 +38,13 @@ const cloudServiceAnswers = [
 ];
 
 test.describe("Legal Document Creator", () => {
-  test("starts with a supported document picker and blank preview", async ({ page }) => {
-    await enterPlatform(page);
+  test("starts with a supported document picker and blank preview", async ({ page }, testInfo) => {
+    await enterPlatform(page, testInfo);
 
     await expect(page.getByLabel("AI chat for legal documents")).toContainText(
       "Which document do you need?",
     );
+    await expect(page.getByText("Documents are draft materials only")).toBeVisible();
     await expect(page.getByLabel("AI chat for legal documents")).toContainText(
       "Cloud Service Agreement",
     );
@@ -48,10 +55,11 @@ test.describe("Legal Document Creator", () => {
     await expect(page.getByRole("heading", { name: "Choose a document" })).toBeVisible();
     await expect(page.getByText("Software License Agreement", { exact: true })).toBeVisible();
     await expect(page.getByText("AI Addendum", { exact: true })).toBeVisible();
+    await expect(page.getByText("No saved documents yet.")).toBeVisible();
   });
 
-  test("selects a supported document and updates the preview after each answer", async ({ page }) => {
-    await enterPlatform(page);
+  test("selects, saves, and reopens a supported document", async ({ page }, testInfo) => {
+    await enterPlatform(page, testInfo);
 
     await sendChatAnswer(page, "Cloud Service Agreement");
 
@@ -87,10 +95,19 @@ test.describe("Legal Document Creator", () => {
     await expect(page.getByLabel("Document completion progress")).toHaveText(
       "16 of 16 details collected",
     );
+    await expect(page.getByText("Draft saved to your documents.")).toBeVisible();
+
+    await page
+      .getByLabel("Collected document details")
+      .getByRole("button", { name: /Cloud Service Agreement/ })
+      .click();
+
+    await expect(page.getByText("Loaded saved draft.")).toBeVisible();
+    await expect(preview.getByText("Workflow automation platform").first()).toBeVisible();
   });
 
-  test("offers a closest supported template for an unsupported request", async ({ page }) => {
-    await enterPlatform(page);
+  test("offers a closest supported template for an unsupported request", async ({ page }, testInfo) => {
+    await enterPlatform(page, testInfo);
 
     await sendChatAnswer(page, "employment offer letter");
 
