@@ -130,6 +130,97 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.chat-progress {
+  margin: 22px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 10px 12px;
+  color: var(--accent-strong);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.chat-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.chat-thread {
+  display: grid;
+  max-height: 42vh;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat-message {
+  display: grid;
+  max-width: 92%;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 10px 12px;
+}
+
+.chat-message.user {
+  justify-self: end;
+  background: var(--soft);
+}
+
+.chat-message span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.chat-message p,
+.complete-panel p {
+  margin: 0;
+  line-height: 1.42;
+}
+
+.chat-form {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.complete-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.field-summary {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.field-summary h2 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.field-summary dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.field-summary div div {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.field-summary dd {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
 form {
   display: grid;
   gap: 18px;

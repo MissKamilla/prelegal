@@ -16,6 +16,7 @@ const eslintConfig = [
       ".next/**",
       "next-env.d.ts",
       "node_modules/**",
+      "out/**",
       "playwright-report/**",
       "test-results/**",
     ],

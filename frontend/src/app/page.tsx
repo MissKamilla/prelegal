@@ -3,44 +3,120 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import {
+  emptyNdaValues,
   formatDate,
-  initialNdaValues,
   NdaFormValues,
   standardTerms,
 } from "@/lib/nda";
-import { ChangeEvent, FormEvent, useLayoutEffect, useRef, useState } from "react";
+import { FormEvent, useLayoutEffect, useRef, useState } from "react";
 
 type Field = {
   key: keyof NdaFormValues;
   label: string;
-  type?: "date" | "number" | "textarea" | "text";
+  question: string;
   section: "Agreement" | "Party 1" | "Party 2" | "Legal";
 };
 
 const fields: Field[] = [
-  { key: "effectiveDate", label: "Effective date", type: "date", section: "Agreement" },
-  { key: "purpose", label: "Purpose", type: "textarea", section: "Agreement" },
-  { key: "mndaTermYears", label: "MNDA term, years", type: "number", section: "Agreement" },
+  {
+    key: "purpose",
+    label: "Purpose",
+    question: "What is the purpose of this Mutual NDA?",
+    section: "Agreement",
+  },
+  {
+    key: "effectiveDate",
+    label: "Effective date",
+    question: "What effective date should appear on the NDA? Use YYYY-MM-DD if you can.",
+    section: "Agreement",
+  },
+  {
+    key: "mndaTermYears",
+    label: "MNDA term, years",
+    question: "How many years should the MNDA remain in effect?",
+    section: "Agreement",
+  },
   {
     key: "confidentialityTermYears",
     label: "Confidentiality term, years",
-    type: "number",
+    question: "How many years should confidentiality obligations survive?",
     section: "Agreement",
   },
-  { key: "partyOneName", label: "Company", section: "Party 1" },
-  { key: "partyOneSigner", label: "Signer name", section: "Party 1" },
-  { key: "partyOneTitle", label: "Signer title", section: "Party 1" },
-  { key: "partyOneAddress", label: "Notice address", type: "textarea", section: "Party 1" },
-  { key: "partyTwoName", label: "Company", section: "Party 2" },
-  { key: "partyTwoSigner", label: "Signer name", section: "Party 2" },
-  { key: "partyTwoTitle", label: "Signer title", section: "Party 2" },
-  { key: "partyTwoAddress", label: "Notice address", type: "textarea", section: "Party 2" },
-  { key: "governingLaw", label: "Governing law", section: "Legal" },
-  { key: "jurisdiction", label: "Jurisdiction", section: "Legal" },
-  { key: "modifications", label: "MNDA modifications", type: "textarea", section: "Legal" },
+  {
+    key: "partyOneName",
+    label: "Company",
+    question: "What is Party 1's legal company name?",
+    section: "Party 1",
+  },
+  {
+    key: "partyOneSigner",
+    label: "Signer name",
+    question: "Who will sign for Party 1?",
+    section: "Party 1",
+  },
+  {
+    key: "partyOneTitle",
+    label: "Signer title",
+    question: "What is Party 1 signer's title?",
+    section: "Party 1",
+  },
+  {
+    key: "partyOneAddress",
+    label: "Notice address",
+    question: "What notice address or email should Party 1 use?",
+    section: "Party 1",
+  },
+  {
+    key: "partyTwoName",
+    label: "Company",
+    question: "What is Party 2's legal company name?",
+    section: "Party 2",
+  },
+  {
+    key: "partyTwoSigner",
+    label: "Signer name",
+    question: "Who will sign for Party 2?",
+    section: "Party 2",
+  },
+  {
+    key: "partyTwoTitle",
+    label: "Signer title",
+    question: "What is Party 2 signer's title?",
+    section: "Party 2",
+  },
+  {
+    key: "partyTwoAddress",
+    label: "Notice address",
+    question: "What notice address or email should Party 2 use?",
+    section: "Party 2",
+  },
+  {
+    key: "governingLaw",
+    label: "Governing law",
+    question: "Which state's law should govern the NDA?",
+    section: "Legal",
+  },
+  {
+    key: "jurisdiction",
+    label: "Jurisdiction",
+    question: "Which courts should have jurisdiction?",
+    section: "Legal",
+  },
+  {
+    key: "modifications",
+    label: "MNDA modifications",
+    question: 'Any modifications to the MNDA? You can answer "None."',
+    section: "Legal",
+  },
 ];
 
 const sections: Field["section"][] = ["Agreement", "Party 1", "Party 2", "Legal"];
+
+type ChatMessage = {
+  id: number;
+  role: "assistant" | "user";
+  content: string;
+};
 
 type FakeUser = {
   email: string;
@@ -52,7 +128,22 @@ export default function Home() {
   const [loginEmail, setLoginEmail] = useState("demo@prelegal.example");
   const [displayName, setDisplayName] = useState("Demo User");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [values, setValues] = useState<NdaFormValues>(initialNdaValues);
+  const [values, setValues] = useState<NdaFormValues>(emptyNdaValues);
+  const [activeFieldIndex, setActiveFieldIndex] = useState(0);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: 1,
+      role: "assistant",
+      content:
+        "Hi, I can help prepare a Mutual NDA. I will ask for the key details and update the draft after each answer.",
+    },
+    {
+      id: 2,
+      role: "assistant",
+      content: fields[0].question,
+    },
+  ]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [termsPages, setTermsPages] = useState([standardTerms]);
   const pageRefs = useRef<Array<HTMLElement | null>>([]);
@@ -118,14 +209,46 @@ export default function Home() {
     };
   }, []);
 
-  function updateField(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    key: keyof NdaFormValues,
-  ) {
+  const completedFields = fields.filter((field) => values[field.key].trim()).length;
+  const isDraftComplete = completedFields === fields.length;
+  const activeField = fields[activeFieldIndex];
+
+  function previewValue(key: keyof NdaFormValues, fallback: string) {
+    return values[key].trim() || fallback;
+  }
+
+  function submitChatAnswer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const answer = chatInput.trim();
+    if (!answer || isDraftComplete || !activeField) {
+      return;
+    }
+
+    const nextFieldIndex = activeFieldIndex + 1;
+    const nextField = fields[nextFieldIndex];
+
     setValues((current) => ({
       ...current,
-      [key]: event.target.value,
+      [activeField.key]: answer,
     }));
+    setChatInput("");
+    setActiveFieldIndex(nextFieldIndex);
+    setChatMessages((current) => [
+      ...current,
+      {
+        id: current.length + 1,
+        role: "user",
+        content: answer,
+      },
+      {
+        id: current.length + 2,
+        role: "assistant",
+        content: nextField
+          ? `Got it. ${nextField.question}`
+          : "Thanks. All required NDA details are filled in. Please review the preview, then download the PDF when ready.",
+      },
+    ]);
   }
 
   async function fakeLogin(event: FormEvent<HTMLFormElement>) {
@@ -264,40 +387,64 @@ export default function Home() {
           Signed in as <strong>{currentUser.displayName}</strong>
         </p>
 
-        <div className="actions">
-          <button type="button" onClick={downloadPdf} disabled={isDownloading}>
-            {isDownloading ? "Preparing PDF..." : "Download PDF"}
-          </button>
+        <div className="chat-progress" aria-label="NDA completion progress">
+          {completedFields} of {fields.length} details collected
         </div>
 
-        <form>
+        <section className="chat-panel" aria-label="AI chat for Mutual NDA">
+          <div className="chat-thread">
+            {chatMessages.map((message) => (
+              <div className={`chat-message ${message.role}`} key={message.id}>
+                <span>{message.role === "assistant" ? "AI" : "You"}</span>
+                <p>{message.content}</p>
+              </div>
+            ))}
+          </div>
+
+          {isDraftComplete ? (
+            <div className="complete-panel">
+              <p>All fields are complete. Review the preview before downloading.</p>
+              <button type="button" onClick={downloadPdf} disabled={isDownloading}>
+                {isDownloading ? "Preparing PDF..." : "Download PDF"}
+              </button>
+            </div>
+          ) : (
+            <form className="chat-form" onSubmit={submitChatAnswer}>
+              <label htmlFor="chat-answer">
+                <span>{activeField.label}</span>
+                <textarea
+                  id="chat-answer"
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  rows={4}
+                  placeholder="Type your answer..."
+                  autoFocus
+                />
+              </label>
+              <button type="submit" disabled={!chatInput.trim()}>
+                Send answer
+              </button>
+            </form>
+          )}
+        </section>
+
+        <section className="field-summary" aria-label="Collected NDA details">
           {sections.map((section) => (
-            <fieldset key={section}>
-              <legend>{section}</legend>
-              {fields
-                .filter((field) => field.section === section)
-                .map((field) => (
-                  <label key={field.key}>
-                    <span>{field.label}</span>
-                    {field.type === "textarea" ? (
-                      <textarea
-                        value={values[field.key]}
-                        onChange={(event) => updateField(event, field.key)}
-                        rows={3}
-                      />
-                    ) : (
-                      <input
-                        type={field.type ?? "text"}
-                        min={field.type === "number" ? "1" : undefined}
-                        value={values[field.key]}
-                        onChange={(event) => updateField(event, field.key)}
-                      />
-                    )}
-                  </label>
-                ))}
-            </fieldset>
+            <div key={section}>
+              <h2>{section}</h2>
+              <dl>
+                {fields
+                  .filter((field) => field.section === section)
+                  .map((field) => (
+                    <div key={field.key}>
+                      <dt>{field.label}</dt>
+                      <dd>{values[field.key] || "Pending"}</dd>
+                    </div>
+                  ))}
+              </dl>
+            </div>
           ))}
-        </form>
+        </section>
       </section>
 
       <section className="preview-panel" aria-label="Mutual NDA preview">
@@ -336,7 +483,7 @@ export default function Home() {
               <dl className="summary-grid">
                 <div>
                   <dt>Purpose</dt>
-                  <dd>{values.purpose}</dd>
+                  <dd>{previewValue("purpose", "[Purpose]")}</dd>
                 </div>
                 <div>
                   <dt>Effective Date</dt>
@@ -344,23 +491,29 @@ export default function Home() {
                 </div>
                 <div>
                   <dt>MNDA Term</dt>
-                  <dd>Expires {values.mndaTermYears} year(s) from Effective Date.</dd>
+                  <dd>
+                    Expires {previewValue("mndaTermYears", "[number]")} year(s) from Effective
+                    Date.
+                  </dd>
                 </div>
                 <div>
                   <dt>Term of Confidentiality</dt>
-                  <dd>{values.confidentialityTermYears} year(s) from Effective Date.</dd>
+                  <dd>
+                    {previewValue("confidentialityTermYears", "[number]")} year(s) from Effective
+                    Date.
+                  </dd>
                 </div>
                 <div>
                   <dt>Governing Law</dt>
-                  <dd>{values.governingLaw}</dd>
+                  <dd>{previewValue("governingLaw", "[state]")}</dd>
                 </div>
                 <div>
                   <dt>Jurisdiction</dt>
-                  <dd>{values.jurisdiction}</dd>
+                  <dd>{previewValue("jurisdiction", "[courts]")}</dd>
                 </div>
                 <div>
                   <dt>Modifications</dt>
-                  <dd>{values.modifications}</dd>
+                  <dd>{previewValue("modifications", "None.")}</dd>
                 </div>
               </dl>
             </section>
@@ -378,23 +531,23 @@ export default function Home() {
                 <tbody>
                   <tr>
                     <th>Company</th>
-                    <td>{values.partyOneName}</td>
-                    <td>{values.partyTwoName}</td>
+                    <td>{previewValue("partyOneName", "[Party 1 company]")}</td>
+                    <td>{previewValue("partyTwoName", "[Party 2 company]")}</td>
                   </tr>
                   <tr>
                     <th>Print Name</th>
-                    <td>{values.partyOneSigner}</td>
-                    <td>{values.partyTwoSigner}</td>
+                    <td>{previewValue("partyOneSigner", "[Party 1 signer]")}</td>
+                    <td>{previewValue("partyTwoSigner", "[Party 2 signer]")}</td>
                   </tr>
                   <tr>
                     <th>Title</th>
-                    <td>{values.partyOneTitle}</td>
-                    <td>{values.partyTwoTitle}</td>
+                    <td>{previewValue("partyOneTitle", "[Party 1 title]")}</td>
+                    <td>{previewValue("partyTwoTitle", "[Party 2 title]")}</td>
                   </tr>
                   <tr>
                     <th>Notice Address</th>
-                    <td>{values.partyOneAddress}</td>
-                    <td>{values.partyTwoAddress}</td>
+                    <td>{previewValue("partyOneAddress", "[Party 1 notice address]")}</td>
+                    <td>{previewValue("partyTwoAddress", "[Party 2 notice address]")}</td>
                   </tr>
                   <tr>
                     <th>Signature</th>
